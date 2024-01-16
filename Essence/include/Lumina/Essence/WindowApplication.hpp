@@ -3,7 +3,7 @@
 #include "Lumina/Essence/Application.hpp"
 #include "Lumina/Essence/Window.hpp"
 
-namespace Lumina::Essence{
+namespace Lumina::Essence {
 
 
 class WindowApplication : public Application {
@@ -13,6 +13,8 @@ public:
     void Tick(float dt) override;
 
 protected:
+    std::vector<const char*> GetRequiredVulkanExtensions() override;
+
     Window window;
 };
 

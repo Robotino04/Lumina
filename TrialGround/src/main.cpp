@@ -19,6 +19,7 @@ private:
 
 int main() {
     TrialGroundApplication app;
+    app.Initialize();
     app.Run();
 
     return 0;

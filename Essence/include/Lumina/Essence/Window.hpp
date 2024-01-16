@@ -7,6 +7,7 @@
 #include <atomic>
 
 #include "Lumina/Essence/Utils/NonCopyable.hpp"
+#include "Lumina/Essence/GLFWReference.hpp"
 
 namespace Lumina::Essence {
 
@@ -22,13 +23,7 @@ public:
 private:
     GLFWwindow* glfwHandle = nullptr;
 
-    static inline std::mutex glfwInitLock;
-
-    /**
-     * @brief How many windows still need glfw to be initialized.
-     *
-     */
-    static inline std::atomic<uint> glfwReferenceCount = 0;
+    GLFWReference glfwKeepInitialized;
 };
 
 }
