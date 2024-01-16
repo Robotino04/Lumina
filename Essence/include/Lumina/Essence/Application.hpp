@@ -2,8 +2,7 @@
 
 #include "Lumina/Essence/Utils/NonCopyable.hpp"
 #include "Lumina/Essence/GLFWReference.hpp"
-
-#include <vulkan/vulkan.hpp>
+#include "Lumina/Essence/Vulkan.hpp"
 
 #include <vector>
 #include <string>
@@ -26,11 +25,21 @@ public:
 
 protected:
     virtual std::vector<const char*> GetRequiredVulkanExtensions();
+    virtual std::vector<const char*> GetRequiredVulkanValidationLayers();
 
 private:
+    static VKAPI_ATTR VkBool32 VKAPI_CALL vulkanValidationlayerCallback(
+        VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+        VkDebugUtilsMessageTypeFlagsEXT messageTypes,
+        VkDebugUtilsMessengerCallbackDataEXT const* pCallbackData,
+        void* pUserData
+    );
+
     bool IsRunning = false;
-    vk::Instance instance;
     bool IsInitialized = false;
+
+    vk::Instance instance;
+    std::optional<vk::DebugUtilsMessengerEXT> debugMessenger;
 };
 
 }
