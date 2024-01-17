@@ -6,6 +6,7 @@
 
 #include <vector>
 #include <string>
+#include <optional>
 
 namespace Lumina::Essence {
 
@@ -26,6 +27,7 @@ public:
 protected:
     virtual std::vector<const char*> GetRequiredVulkanExtensions() const;
     virtual std::vector<const char*> GetRequiredVulkanValidationLayers() const;
+    virtual std::vector<const char*> GetRequiredVulkanPerDeviceExtensions() const;
     virtual int ScoreDeviceSuitability(vk::PhysicalDevice dev) const;
 
 private:
@@ -38,6 +40,7 @@ private:
 
     void CreateVulkanInstance();
     void PickPhysicalDevice();
+    void CreateLogicalDevice();
 
     bool IsRunning = false;
     bool IsInitialized = false;
@@ -45,6 +48,18 @@ private:
     vk::Instance instance;
     std::optional<vk::DebugUtilsMessengerEXT> debugMessenger;
     vk::PhysicalDevice physicalDevice;
+    vk::Device device;
+    vk::Queue graphicsQueue;
+
+
+    struct QueueFamilyIndices {
+        std::optional<uint32_t> graphicsFamily;
+
+        bool isComplete() const {
+            return graphicsFamily.has_value();
+        }
+    };
+    QueueFamilyIndices GetQueueFamilyIndices(vk::PhysicalDevice dev) const;
 };
 
 }

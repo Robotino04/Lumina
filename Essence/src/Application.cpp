@@ -10,6 +10,8 @@ namespace Lumina::Essence {
 
 Application::Application(std::string const& appName): Name(appName) {}
 Application::~Application() {
+    std::cout << "Application shutting down...\n";
+    device.destroy();
     if (debugMessenger.has_value()) instance.destroyDebugUtilsMessengerEXT(debugMessenger.value());
     instance.destroy();
 }
@@ -18,6 +20,7 @@ void Application::Initialize() {
     std::cout << "Initializing Application\n";
     CreateVulkanInstance();
     PickPhysicalDevice();
+    CreateLogicalDevice();
 
     std::cout << "Vulkan initialized\n";
     IsInitialized = true;
@@ -135,34 +138,47 @@ void Application::PickPhysicalDevice() {
 
     std::cout << "Using device " << physicalDevice.getProperties().deviceName << "\n";
 }
+void Application::CreateLogicalDevice() {
+    QueueFamilyIndices indices = GetQueueFamilyIndices(physicalDevice);
+
+    std::vector<float> priorities = {1.0f};
+    std::vector<vk::DeviceQueueCreateInfo> queueCreateInfo = {
+        {{}, indices.graphicsFamily.value(), priorities},
+    };
+
+    vk::PhysicalDeviceFeatures deviceFeatures;
+
+    auto vlayers = GetRequiredVulkanValidationLayers();
+    auto exts = GetRequiredVulkanPerDeviceExtensions();
+    vk::DeviceCreateInfo deviceCreateInfo({}, queueCreateInfo, vlayers, exts);
+    device = physicalDevice.createDevice(deviceCreateInfo);
+    graphicsQueue = device.getQueue(indices.graphicsFamily.value(), 0);
+}
+
+
 int Application::ScoreDeviceSuitability(vk::PhysicalDevice dev) const {
     auto deviceProperties = dev.getProperties();
 
-    struct {
-        std::optional<uint32_t> graphicsFamily;
-
-        bool isComplete() {
-            return graphicsFamily.has_value();
-        }
-    } queueIndices;
-
-    auto queueFamilies = dev.getQueueFamilyProperties();
-    int i = 0;
-    for (auto qfam : queueFamilies) {
-        if (qfam.queueFlags & vk::QueueFlagBits::eGraphics) {
-            queueIndices.graphicsFamily = i;
-        }
-
-        if (queueIndices.isComplete()) break;
-
-        i++;
-    }
-
-    if (!queueIndices.isComplete()) return -1;
+    if (!GetQueueFamilyIndices(dev).isComplete()) return -1;
 
     return 0;
 }
 
+Application::QueueFamilyIndices Application::GetQueueFamilyIndices(vk::PhysicalDevice dev) const {
+    QueueFamilyIndices queueFamilyIndices;
+    auto queueFamilies = dev.getQueueFamilyProperties();
+    int i = 0;
+    for (auto qfam : queueFamilies) {
+        if (qfam.queueFlags & vk::QueueFlagBits::eGraphics) {
+            queueFamilyIndices.graphicsFamily = i;
+        }
+
+        if (queueFamilyIndices.isComplete()) break;
+
+        i++;
+    }
+    return queueFamilyIndices;
+}
 
 void Application::Run() {
     if (!IsInitialized)
@@ -191,6 +207,11 @@ std::vector<const char*> Application::GetRequiredVulkanExtensions() const {
         return {};
     }
 }
+
+std::vector<const char*> Application::GetRequiredVulkanPerDeviceExtensions() const {
+    return {};
+}
+
 
 std::vector<const char*> Application::GetRequiredVulkanValidationLayers() const {
     if constexpr (BuildMode::Current == BuildMode::Debug) {
