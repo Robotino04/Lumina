@@ -13,7 +13,7 @@ public:
     void Tick(float dt) override;
 
 protected:
-    std::vector<const char*> GetRequiredVulkanExtensions() override;
+    std::vector<const char*> GetRequiredVulkanExtensions() const override;
 
     Window window;
 };

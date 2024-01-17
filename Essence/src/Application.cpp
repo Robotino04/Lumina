@@ -16,6 +16,14 @@ Application::~Application() {
 
 void Application::Initialize() {
     std::cout << "Initializing Application\n";
+    CreateVulkanInstance();
+    PickPhysicalDevice();
+
+    std::cout << "Vulkan initialized\n";
+    IsInitialized = true;
+}
+
+void Application::CreateVulkanInstance() {
     VULKAN_HPP_DEFAULT_DISPATCHER.init();
 
     const auto pprintVersion = [](uint32_t v) {
@@ -99,9 +107,60 @@ void Application::Initialize() {
     if (requiredValidationLayers.size()) {
         debugMessenger = instance.createDebugUtilsMessengerEXT(debugMessengerCreateInfo);
     }
+}
+void Application::PickPhysicalDevice() {
+    std::cout << "Available devices:\n";
+    auto availableDevices = instance.enumeratePhysicalDevices();
+    bool foundDevice = false;
+    int32_t maxDeviceScore = -1;
 
-    std::cout << "Vulkan initialized\n";
-    IsInitialized = true;
+    for (auto dev : availableDevices) {
+
+        int32_t score = ScoreDeviceSuitability(dev);
+
+        if (score > maxDeviceScore) {
+            maxDeviceScore = score;
+            foundDevice = true;
+            physicalDevice = dev;
+        }
+        std::cout << " - " << dev.getProperties().deviceName << " (" << score << ")\n";
+        auto queueFamilies = dev.getQueueFamilyProperties();
+        for (auto qfam : queueFamilies) {
+            std::cout << "    - " << vk::to_string(qfam.queueFlags) << "\n";
+        }
+    }
+    if (!foundDevice) {
+        throw std::runtime_error("No suitable device was found");
+    }
+
+    std::cout << "Using device " << physicalDevice.getProperties().deviceName << "\n";
+}
+int Application::ScoreDeviceSuitability(vk::PhysicalDevice dev) const {
+    auto deviceProperties = dev.getProperties();
+
+    struct {
+        std::optional<uint32_t> graphicsFamily;
+
+        bool isComplete() {
+            return graphicsFamily.has_value();
+        }
+    } queueIndices;
+
+    auto queueFamilies = dev.getQueueFamilyProperties();
+    int i = 0;
+    for (auto qfam : queueFamilies) {
+        if (qfam.queueFlags & vk::QueueFlagBits::eGraphics) {
+            queueIndices.graphicsFamily = i;
+        }
+
+        if (queueIndices.isComplete()) break;
+
+        i++;
+    }
+
+    if (!queueIndices.isComplete()) return -1;
+
+    return 0;
 }
 
 
@@ -124,7 +183,7 @@ void Application::Exit() {
 
 void Application::Tick(float dt) {}
 
-std::vector<const char*> Application::GetRequiredVulkanExtensions() {
+std::vector<const char*> Application::GetRequiredVulkanExtensions() const {
     if constexpr (BuildMode::Current == BuildMode::Debug) {
         return {VK_EXT_DEBUG_UTILS_EXTENSION_NAME};
     }
@@ -133,7 +192,7 @@ std::vector<const char*> Application::GetRequiredVulkanExtensions() {
     }
 }
 
-std::vector<const char*> Application::GetRequiredVulkanValidationLayers() {
+std::vector<const char*> Application::GetRequiredVulkanValidationLayers() const {
     if constexpr (BuildMode::Current == BuildMode::Debug) {
         return {
             "VK_LAYER_KHRONOS_validation",

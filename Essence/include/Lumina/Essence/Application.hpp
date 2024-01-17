@@ -24,8 +24,9 @@ public:
     const std::string Name;
 
 protected:
-    virtual std::vector<const char*> GetRequiredVulkanExtensions();
-    virtual std::vector<const char*> GetRequiredVulkanValidationLayers();
+    virtual std::vector<const char*> GetRequiredVulkanExtensions() const;
+    virtual std::vector<const char*> GetRequiredVulkanValidationLayers() const;
+    virtual int ScoreDeviceSuitability(vk::PhysicalDevice dev) const;
 
 private:
     static VKAPI_ATTR VkBool32 VKAPI_CALL vulkanValidationlayerCallback(
@@ -35,11 +36,15 @@ private:
         void* pUserData
     );
 
+    void CreateVulkanInstance();
+    void PickPhysicalDevice();
+
     bool IsRunning = false;
     bool IsInitialized = false;
 
     vk::Instance instance;
     std::optional<vk::DebugUtilsMessengerEXT> debugMessenger;
+    vk::PhysicalDevice physicalDevice;
 };
 
 }

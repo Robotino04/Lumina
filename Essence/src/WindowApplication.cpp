@@ -16,7 +16,7 @@ void WindowApplication::Tick(float dt) {
 }
 
 
-std::vector<const char*> WindowApplication::GetRequiredVulkanExtensions() {
+std::vector<const char*> WindowApplication::GetRequiredVulkanExtensions() const {
     auto parentExtensions = Application::GetRequiredVulkanExtensions();
 
     uint32_t glfwExtensionCount = 0;
