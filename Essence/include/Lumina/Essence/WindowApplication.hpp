@@ -14,6 +14,8 @@ public:
 
 protected:
     std::vector<const char*> GetRequiredVulkanExtensions() const override;
+    std::optional<vk::SurfaceKHR> CreateVulkanSurface() const override;
+
 
     Window window;
 };

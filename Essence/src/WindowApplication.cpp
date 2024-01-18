@@ -30,4 +30,10 @@ std::vector<const char*> WindowApplication::GetRequiredVulkanExtensions() const 
     return parentExtensions;
 }
 
+
+std::optional<vk::SurfaceKHR> WindowApplication::CreateVulkanSurface() const {
+    return window.CreateWindowSurface(instance);
+}
+
+
 }

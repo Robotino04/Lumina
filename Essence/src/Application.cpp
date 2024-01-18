@@ -4,6 +4,7 @@
 #include <format>
 #include <iostream>
 #include <stdexcept>
+#include <set>
 #include <GLFW/glfw3.h>
 
 namespace Lumina::Essence {
@@ -11,7 +12,9 @@ namespace Lumina::Essence {
 Application::Application(std::string const& appName): Name(appName) {}
 Application::~Application() {
     std::cout << "Application shutting down...\n";
+
     device.destroy();
+    if (surface.has_value()) instance.destroySurfaceKHR(surface.value());
     if (debugMessenger.has_value()) instance.destroyDebugUtilsMessengerEXT(debugMessenger.value());
     instance.destroy();
 }
@@ -19,6 +22,7 @@ Application::~Application() {
 void Application::Initialize() {
     std::cout << "Initializing Application\n";
     CreateVulkanInstance();
+    surface = CreateVulkanSurface();
     PickPhysicalDevice();
     CreateLogicalDevice();
 
@@ -96,11 +100,7 @@ void Application::CreateVulkanInstance() {
         nullptr
     };
     vk::StructureChain<vk::InstanceCreateInfo, vk::DebugUtilsMessengerCreateInfoEXT> instanceInfo = {
-        {
-         {},
-         &appInfo,
-         requiredValidationLayers, requiredExtensions,
-         },
+        {{}, &appInfo, requiredValidationLayers, requiredExtensions},
         debugMessengerCreateInfo
     };
 
@@ -141,27 +141,43 @@ void Application::PickPhysicalDevice() {
 void Application::CreateLogicalDevice() {
     QueueFamilyIndices indices = GetQueueFamilyIndices(physicalDevice);
 
-    std::vector<float> priorities = {1.0f};
-    std::vector<vk::DeviceQueueCreateInfo> queueCreateInfo = {
-        {{}, indices.graphicsFamily.value(), priorities},
+    std::set<uint32_t> uniqueQueueFamilies = {
+        indices.graphicsFamily.value(),
     };
+    if (indices.presentFamily.has_value()) {
+        uniqueQueueFamilies.insert(indices.presentFamily.value());
+    }
+
+    std::vector<float> priorities = {1.0f};
+    std::vector<vk::DeviceQueueCreateInfo> queueCreateInfo = {};
+    for (auto queueFamily : uniqueQueueFamilies) {
+        queueCreateInfo.push_back({{}, queueFamily, priorities});
+    }
 
     vk::PhysicalDeviceFeatures deviceFeatures;
 
     auto vlayers = GetRequiredVulkanValidationLayers();
     auto exts = GetRequiredVulkanPerDeviceExtensions();
     vk::DeviceCreateInfo deviceCreateInfo({}, queueCreateInfo, vlayers, exts);
+
     device = physicalDevice.createDevice(deviceCreateInfo);
+
     graphicsQueue = device.getQueue(indices.graphicsFamily.value(), 0);
+    presentQueue = surface.has_value() ? device.getQueue(indices.presentFamily.value(), 0)
+                                       : std::optional<vk::Queue>{};
 }
 
 
 int Application::ScoreDeviceSuitability(vk::PhysicalDevice dev) const {
     auto deviceProperties = dev.getProperties();
 
-    if (!GetQueueFamilyIndices(dev).isComplete()) return -1;
+    if (!GetQueueFamilyIndices(dev).isComplete(surface.has_value())) return -1;
 
     return 0;
+}
+
+std::optional<vk::SurfaceKHR> Application::CreateVulkanSurface() const {
+    return {};
 }
 
 Application::QueueFamilyIndices Application::GetQueueFamilyIndices(vk::PhysicalDevice dev) const {
@@ -173,7 +189,11 @@ Application::QueueFamilyIndices Application::GetQueueFamilyIndices(vk::PhysicalD
             queueFamilyIndices.graphicsFamily = i;
         }
 
-        if (queueFamilyIndices.isComplete()) break;
+        if (surface.has_value() && dev.getSurfaceSupportKHR(i, surface.value())) {
+            queueFamilyIndices.presentFamily = i;
+        }
+
+        if (queueFamilyIndices.isComplete(surface.has_value())) break;
 
         i++;
     }
