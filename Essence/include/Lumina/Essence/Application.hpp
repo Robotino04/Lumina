@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Lumina/Essence/Utils/NonCopyable.hpp"
-#include "Lumina/Essence/GLFWReference.hpp"
+#include "Lumina/Essence/Window.hpp"
 #include "Lumina/Essence/Vulkan.hpp"
 
 #include <vector>
@@ -12,7 +12,7 @@ namespace Lumina::Essence {
 
 class Application : NonCopyable {
 public:
-    Application(std::string const& appName);
+    Application(glm::ivec2 windowSize, std::string const& windowTitle);
     virtual ~Application();
     virtual void Initialize();
 
@@ -25,20 +25,22 @@ public:
     const std::string Name;
 
 protected:
-    virtual std::vector<const char*> GetRequiredVulkanExtensions() const;
-    virtual std::vector<const char*> GetRequiredVulkanValidationLayers() const;
-    virtual std::vector<const char*> GetRequiredVulkanPerDeviceExtensions() const;
-    virtual int ScoreDeviceSuitability(vk::PhysicalDevice dev) const;
-
-    virtual std::optional<vk::SurfaceKHR> CreateVulkanSurface() const;
-
     vk::Instance instance;
     std::optional<vk::DebugUtilsMessengerEXT> debugMessenger;
-    std::optional<vk::SurfaceKHR> surface;
+    vk::SurfaceKHR surface;
+    vk::SwapchainKHR swapchain;
     vk::PhysicalDevice physicalDevice;
     vk::Device device;
+
     vk::Queue graphicsQueue;
     std::optional<vk::Queue> presentQueue;
+    std::vector<vk::Image> swapchainImages;
+
+
+    vk::Format swapchainImageFormat;
+    vk::Extent2D swapchainExtent;
+
+    Window window;
 
 private:
     static VKAPI_ATTR VkBool32 VKAPI_CALL vulkanValidationlayerCallback(
@@ -49,21 +51,43 @@ private:
     );
 
     void CreateVulkanInstance();
+    void CreateVulkanSurface();
     void PickPhysicalDevice();
     void CreateLogicalDevice();
+    void CreateSwapchain();
 
-    bool IsRunning = false;
-    bool IsInitialized = false;
+
+    std::vector<const char*> GetRequiredVulkanExtensions() const;
+    std::vector<const char*> GetRequiredVulkanValidationLayers() const;
+    std::vector<const char*> GetRequiredVulkanDeviceExtensions() const;
+    int ScoreDeviceSuitability(vk::PhysicalDevice dev) const;
+
 
     struct QueueFamilyIndices {
         std::optional<uint32_t> graphicsFamily;
         std::optional<uint32_t> presentFamily;
 
-        bool isComplete(bool needsPresentation) const {
-            return graphicsFamily.has_value() && (presentFamily.has_value() || !needsPresentation);
+        bool isComplete() const {
+            return graphicsFamily.has_value() && presentFamily.has_value();
         }
     };
     QueueFamilyIndices GetQueueFamilyIndices(vk::PhysicalDevice dev) const;
+    bool DeviceSupportsAllExtensions(vk::PhysicalDevice dev) const;
+
+
+    struct SwapChainSupportDetails {
+        vk::SurfaceCapabilitiesKHR capabilities;
+        std::vector<vk::SurfaceFormatKHR> formats;
+        std::vector<vk::PresentModeKHR> presentModes;
+    };
+    SwapChainSupportDetails QuerySwapchainSupport(vk::PhysicalDevice device) const;
+
+    vk::SurfaceFormatKHR ChooseSwapchainSurfaceFormat(std::vector<vk::SurfaceFormatKHR> const& availableFormats) const;
+    vk::PresentModeKHR ChooseSwapchainPresentMode(std::vector<vk::PresentModeKHR> const& availablePresentModes) const;
+    vk::Extent2D ChooseSwapchainExtent(vk::SurfaceCapabilitiesKHR const& capabilities) const;
+
+    bool IsRunning = false;
+    bool IsInitialized = false;
 };
 
 }

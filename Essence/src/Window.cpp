@@ -31,5 +31,10 @@ vk::SurfaceKHR Window::CreateWindowSurface(vk::Instance instance) const {
     }
     return surface;
 }
+glm::ivec2 Window::GetFramebufferSize() const {
+    int width, height;
+    glfwGetFramebufferSize(glfwHandle, &width, &height);
+    return {width, height};
+}
 
 }

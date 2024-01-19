@@ -11,6 +11,8 @@ GLFWReference::GLFWReference() {
         if (glfwInit() == GLFW_FALSE) {
             throw std::runtime_error("GLFW initialization failed.\n");
         }
+
+        glfwSetErrorCallback(glfwErrorCallback);
     }
     glfwReferenceCount++;
 }
@@ -21,6 +23,11 @@ GLFWReference::~GLFWReference() {
     if (glfwReferenceCount == 1) {
         glfwTerminate();
     }
+}
+
+
+void GLFWReference::glfwErrorCallback(int code, const char* description) {
+    std::cerr << "[GLFW][Error] " << code << ": " << description << std::endl;
 }
 
 }

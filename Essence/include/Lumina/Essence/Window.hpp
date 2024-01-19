@@ -22,6 +22,7 @@ public:
     static void PollEvents();
 
     vk::SurfaceKHR CreateWindowSurface(vk::Instance instance) const;
+    glm::ivec2 GetFramebufferSize() const;
 
 private:
     GLFWwindow* glfwHandle = nullptr;

@@ -1,17 +1,17 @@
 #include <iostream>
 
-#include "Lumina/Essence/WindowApplication.hpp"
+#include "Lumina/Essence/Application.hpp"
 
 using namespace Lumina;
 
-class TrialGroundApplication : public Essence::WindowApplication {
+class TrialGroundApplication : public Essence::Application {
 public:
-    TrialGroundApplication(): WindowApplication({800, 600}, "Lumina Trial Ground") {
+    TrialGroundApplication(): Application({800, 600}, "Lumina Trial Ground") {
         std::cout << "Hi!\n";
     }
 
     void Tick(float dt) override {
-        WindowApplication::Tick(dt);
+        Application::Tick(dt);
     }
 
 private:

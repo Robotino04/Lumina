@@ -16,6 +16,8 @@ public:
 private:
     static inline std::mutex glfwInitLock;
     static inline std::atomic<unsigned int> glfwReferenceCount = 0;
+
+    static void glfwErrorCallback(int code, const char* description);
 };
 
 }
