@@ -34,8 +34,9 @@ protected:
 
     vk::Queue graphicsQueue;
     std::optional<vk::Queue> presentQueue;
-    std::vector<vk::Image> swapchainImages;
 
+    std::vector<vk::Image> swapchainImages;
+    std::vector<vk::ImageView> swapchainImageViews;
 
     vk::Format swapchainImageFormat;
     vk::Extent2D swapchainExtent;
@@ -55,6 +56,7 @@ private:
     void PickPhysicalDevice();
     void CreateLogicalDevice();
     void CreateSwapchain();
+    void CreateImageViews();
 
 
     std::vector<const char*> GetRequiredVulkanExtensions() const;

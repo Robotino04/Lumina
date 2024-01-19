@@ -1,5 +1,6 @@
 BasedOnStyle: WebKit
 ColumnLimit: 110
+IndentWidth: 4
 ---
 Language: Cpp
 AlignEscapedNewlines: Left
@@ -13,11 +14,13 @@ BraceWrapping:
   BeforeCatch: true
   BeforeElse: true
 BreakBeforeBraces: Custom
+IndentBraces: false
 BreakConstructorInitializers: BeforeColon
 Cpp11BracedListStyle: true
 IndentCaseLabels: true
 MaxEmptyLinesToKeep: 2
 ContinuationIndentWidth: 4
+BracedInitializerIndentWidth: 4
 SortIncludes: false
 SortUsingDeclarations: false
 SpaceBeforeCpp11BracedList: false
@@ -38,6 +41,7 @@ AlignTrailingComments:
   OverEmptyLines: 1
 PackConstructorInitializers: NextLine
 AlignArrayOfStructures: Left
+AllowAllArgumentsOnNextLine: false
 AlignConsecutiveShortCaseStatements:
   Enabled: true
   AlignCaseColons: false

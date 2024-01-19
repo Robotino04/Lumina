@@ -17,6 +17,10 @@ Application::Application(glm::ivec2 windowSize, std::string const& windowTitle)
 Application::~Application() {
     std::cout << "Application shutting down...\n";
 
+    for (auto view : swapchainImageViews) {
+        device.destroyImageView(view);
+    }
+
     device.destroySwapchainKHR(swapchain);
     device.destroy();
     instance.destroySurfaceKHR(surface);
@@ -31,6 +35,7 @@ void Application::Initialize() {
     PickPhysicalDevice();
     CreateLogicalDevice();
     CreateSwapchain();
+    CreateImageViews();
 
     std::cout << "Vulkan initialized\n";
     IsInitialized = true;
@@ -45,9 +50,7 @@ void Application::CreateVulkanInstance() {
     };
 
 
-    vk::ApplicationInfo appInfo(
-        Name.c_str(), vk::makeVersion(1, 0, 0), "Lumina", vk::makeVersion(1, 0, 0), vk::makeApiVersion(0, 1, 0, 0)
-    );
+    vk::ApplicationInfo appInfo(Name.c_str(), vk::makeVersion(1, 0, 0), "Lumina", vk::makeVersion(1, 0, 0), vk::makeApiVersion(0, 1, 0, 0));
 
 
     std::cout << "Initializing Vulkan: \n - " << appInfo.pApplicationName << " "
@@ -191,11 +194,10 @@ void Application::CreateLogicalDevice() {
 void Application::CreateSwapchain() {
     QueueFamilyIndices indices = GetQueueFamilyIndices(physicalDevice);
     SwapChainSupportDetails swapchainSupport = QuerySwapchainSupport(physicalDevice);
-    uint32_t imageCount = swapchainSupport.capabilities.maxImageCount == 0
-                            ? swapchainSupport.capabilities.minImageCount + 1
-                            : std::min(
-                                swapchainSupport.capabilities.minImageCount + 1, swapchainSupport.capabilities.maxImageCount
-                            );
+    uint32_t imageCount =
+        swapchainSupport.capabilities.maxImageCount == 0
+            ? swapchainSupport.capabilities.minImageCount + 1
+            : std::min(swapchainSupport.capabilities.minImageCount + 1, swapchainSupport.capabilities.maxImageCount);
 
     auto surfaceFormat = ChooseSwapchainSurfaceFormat(swapchainSupport.formats);
     swapchainImageFormat = surfaceFormat.format;
@@ -231,6 +233,33 @@ void Application::CreateSwapchain() {
 
     swapchainImages = device.getSwapchainImagesKHR(swapchain);
 }
+void Application::CreateImageViews() {
+    std::cout << "Creating image views\n";
+    swapchainImageViews.reserve(swapchainImages.size());
+
+    for (auto const& image : swapchainImages) {
+        vk::ImageViewCreateInfo createInfo = {
+            {},
+            image,
+            vk::ImageViewType::e2D,
+            swapchainImageFormat,
+            {
+             vk::ComponentSwizzle::eIdentity,
+             vk::ComponentSwizzle::eIdentity,
+             vk::ComponentSwizzle::eIdentity,
+             vk::ComponentSwizzle::eIdentity,
+             },
+            {
+             vk::ImageAspectFlagBits::eColor,
+             0, 1,
+             0, 1,
+             },
+        };
+
+        swapchainImageViews.push_back(device.createImageView(createInfo));
+    }
+}
+
 
 bool Application::DeviceSupportsAllExtensions(vk::PhysicalDevice dev) const {
     auto availableExtensions = dev.enumerateDeviceExtensionProperties();
@@ -320,12 +349,10 @@ vk::Extent2D Application::ChooseSwapchainExtent(vk::SurfaceCapabilitiesKHR const
 
     glm::ivec2 fbSize = window.GetFramebufferSize();
     vk::Extent2D extent;
-    extent.width = glm::clamp<uint32_t>(
-        fbSize.x, capabilities.minImageExtent.width, capabilities.maxImageExtent.width
-    );
-    extent.height = glm::clamp<uint32_t>(
-        fbSize.y, capabilities.minImageExtent.height, capabilities.maxImageExtent.height
-    );
+    extent.width =
+        glm::clamp<uint32_t>(fbSize.x, capabilities.minImageExtent.width, capabilities.maxImageExtent.width);
+    extent.height =
+        glm::clamp<uint32_t>(fbSize.y, capabilities.minImageExtent.height, capabilities.maxImageExtent.height);
     return extent;
 }
 
