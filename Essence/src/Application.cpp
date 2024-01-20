@@ -102,15 +102,15 @@ void Application::CreateVulkanInstance() {
         throw std::runtime_error("Some validation layers weren't available");
     }
 
-
+    using enum vk::DebugUtilsMessageSeverityFlagBitsEXT;
+    using enum vk::DebugUtilsMessageTypeFlagBitsEXT;
     vk::DebugUtilsMessengerCreateInfoEXT debugMessengerCreateInfo = {
-        {},
-        vk::DebugUtilsMessageSeverityFlagBitsEXT::eError | vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning
-            | vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose | vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo,
-        vk::DebugUtilsMessageTypeFlagBitsEXT::eDeviceAddressBinding | vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral
-            | vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance | vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation,
-        &Application::vulkanValidationlayerCallback,
-        nullptr
+        {},                                                            // Flags
+        eError | eWarning | eVerbose | eInfo,                          // message severity selection
+        eDeviceAddressBinding | eGeneral | ePerformance | eValidation, // message type selection
+        &Application::vulkanValidationlayerCallback,                   // callback
+        nullptr,                                                       // user data
+
     };
     vk::StructureChain<vk::InstanceCreateInfo, vk::DebugUtilsMessengerCreateInfoEXT> instanceInfo = {
         {{}, &appInfo, requiredValidationLayers, requiredExtensions},
@@ -198,38 +198,40 @@ void Application::CreateLogicalDevice() {
 void Application::CreateSwapchain() {
     QueueFamilyIndices indices = GetQueueFamilyIndices(physicalDevice);
     SwapChainSupportDetails swapchainSupport = QuerySwapchainSupport(physicalDevice);
-    uint32_t imageCount =
-        swapchainSupport.capabilities.maxImageCount == 0
-            ? swapchainSupport.capabilities.minImageCount + 1
-            : std::min(swapchainSupport.capabilities.minImageCount + 1, swapchainSupport.capabilities.maxImageCount);
+    uint32_t imageCount;
+    if (swapchainSupport.capabilities.maxImageCount == 0)
+        imageCount = swapchainSupport.capabilities.minImageCount + 1;
+    else
+        imageCount = std::min(swapchainSupport.capabilities.minImageCount + 1, swapchainSupport.capabilities.maxImageCount);
 
     auto surfaceFormat = ChooseSwapchainSurfaceFormat(swapchainSupport.formats);
     swapchainImageFormat = surfaceFormat.format;
     swapchainExtent = ChooseSwapchainExtent(swapchainSupport.capabilities);
 
-    bool needsParallelism = indices.graphicsFamily.value() != indices.presentFamily.value();
+    bool needsSharing = indices.graphicsFamily.value() != indices.presentFamily.value();
 
     std::vector<uint32_t> queueIndices = {indices.graphicsFamily.value(), indices.presentFamily.value()};
-    if (!needsParallelism) {
+    if (!needsSharing) {
         queueIndices = {};
     }
+    vk::SharingMode sharingMode = needsSharing ? vk::SharingMode::eConcurrent : vk::SharingMode::eExclusive;
 
     vk::SwapchainCreateInfoKHR createInfo = {
-        {},
-        surface,
-        imageCount,
-        swapchainImageFormat,
-        surfaceFormat.colorSpace,
-        swapchainExtent,
-        1,
-        vk::ImageUsageFlagBits::eColorAttachment,
-        needsParallelism ? vk::SharingMode::eConcurrent : vk::SharingMode::eExclusive,
-        queueIndices,
-        swapchainSupport.capabilities.currentTransform,
-        vk::CompositeAlphaFlagBitsKHR::eOpaque,
-        ChooseSwapchainPresentMode(swapchainSupport.presentModes),
-        vk::True,
-        nullptr
+        {},                                                        // flags
+        surface,                                                   // surface
+        imageCount,                                                // num images
+        swapchainImageFormat,                                      // image format
+        surfaceFormat.colorSpace,                                  // color space
+        swapchainExtent,                                           // size
+        1,                                                         // num image layers
+        vk::ImageUsageFlagBits::eColorAttachment,                  // use for rendering
+        sharingMode,                                               // sharing mode
+        queueIndices,                                              // queues
+        swapchainSupport.capabilities.currentTransform,            // transformations
+        vk::CompositeAlphaFlagBitsKHR::eOpaque,                    // how to handle alpha channel
+        ChooseSwapchainPresentMode(swapchainSupport.presentModes), // present mode
+        vk::True,                                                  // enable clipping
+        nullptr                                                    // previous swapchain
     };
 
     std::cout << "Creating swapchain\n";
@@ -243,21 +245,23 @@ void Application::CreateImageViews() {
 
     for (auto const& image : swapchainImages) {
         vk::ImageViewCreateInfo createInfo = {
-            {},
+            {}, // flags
             image,
             vk::ImageViewType::e2D,
             swapchainImageFormat,
             {
-             vk::ComponentSwizzle::eIdentity,
-             vk::ComponentSwizzle::eIdentity,
-             vk::ComponentSwizzle::eIdentity,
-             vk::ComponentSwizzle::eIdentity,
-             },
+             vk::ComponentSwizzle::eIdentity, // red
+                vk::ComponentSwizzle::eIdentity, // green
+                vk::ComponentSwizzle::eIdentity, // blue
+                vk::ComponentSwizzle::eIdentity, // alpha
+            },
             {
-             vk::ImageAspectFlagBits::eColor,
-             0, 1,
-             0, 1,
-             },
+             vk::ImageAspectFlagBits::eColor, // aspect mask
+                0,                               // base mip level
+                1,                               // mip level count
+                0,                               // base array layer
+                1,                               // array layer count
+            },
         };
 
         swapchainImageViews.push_back(device.createImageView(createInfo));
@@ -385,25 +389,25 @@ void Application::CreateGraphicsPipeline() {
 
     vk::PipelineVertexInputStateCreateInfo vertexInputInfo = {};
     vk::PipelineInputAssemblyStateCreateInfo inputAssemblyInfo = {
-        {},
-        vk::PrimitiveTopology::eTriangleList,
-        vk::False,
+        {},                                   // flags
+        vk::PrimitiveTopology::eTriangleList, // how to interpret the vertices
+        vk::False                             // enable primitive restart
     };
 
     vk::Viewport viewport = {
-        0.0f,
-        0.0f,
-        swapchainExtent.width,
-        swapchainExtent.height,
-        0.0f,
-        1.0f,
+        0.0f,                          // x
+        0.0f,                          // y
+        (float)swapchainExtent.width,  // width
+        (float)swapchainExtent.height, // height
+        0.0f,                          // min depth
+        1.0f,                          // max depth
     };
     vk::Rect2D scissor = {
-        {0, 0},
-        swapchainExtent
+        {0, 0}, // top left
+        swapchainExtent, // size
     };
 
-
+    // Parameters that can be changed without recreating the pipeline
     std::vector<vk::DynamicState> dynamicStates = {
         vk::DynamicState::eViewport,
         vk::DynamicState::eScissor,
@@ -412,57 +416,59 @@ void Application::CreateGraphicsPipeline() {
     vk::PipelineDynamicStateCreateInfo dynamicStateCreateInfo = {{}, dynamicStates};
 
     vk::PipelineViewportStateCreateInfo viewportInfo = {
-        {},
-        1,
-        nullptr,
-        1,
-        nullptr,
+        {},      // flags
+        1,       // num viewports
+        nullptr, // viewports are set dynamically
+        1,       // num scissors
+        nullptr, // scissors are set dynamically
     };
 
     vk::PipelineRasterizationStateCreateInfo rasterizerInfo = {
-        {},
-        vk::False,
-        vk::False,
-        vk::PolygonMode::eFill,
-        vk::CullModeFlagBits::eBack,
-        vk::FrontFace::eClockwise,
-        vk::False,
-        0.0f,
-        0.0f,
-        0.0f,
+        {},                          // flags
+        vk::False,                   // enable depth clamp
+        vk::False,                   // enable discard
+        vk::PolygonMode::eFill,      // fill polygons
+        vk::CullModeFlagBits::eBack, // cull back faces
+        vk::FrontFace::eClockwise,   // triangles are clockwise
+        vk::False,                   // enable depth bias
+        0.0f,                        // depth bias factor
+        0.0f,                        // depth bias clamp
+        0.0f,                        // dapth bias slope factor
     };
 
     vk::PipelineMultisampleStateCreateInfo multisampleInfo = {
-        {},
-        vk::SampleCountFlagBits::e1,
-        vk::False,
-        1.0f,
-        nullptr,
-        vk::False,
-        vk::False,
+        {},                          // flags
+        vk::SampleCountFlagBits::e1, // num samples
+        vk::False,                   // enable sample shading
+        1.0f,                        // min sample shading
+        nullptr,                     // sample mask
+        vk::False,                   // enable alpha to coverage
+        vk::False,                   // enable alpha to one
     };
 
+    using CComponent = vk::ColorComponentFlagBits;
     vk::PipelineColorBlendAttachmentState colorBlendAttachment = {
-        vk::False,
-        vk::BlendFactor::eSrcAlpha,
-        vk::BlendFactor::eOneMinusSrcAlpha,
-        vk::BlendOp::eAdd,
-        vk::BlendFactor::eOne,
-        vk::BlendFactor::eZero,
-        vk::BlendOp::eAdd,
-        vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB
-            | vk::ColorComponentFlagBits::eA,
+        vk::False,                          // enable blending
+        vk::BlendFactor::eSrcAlpha,         // source color blend factor
+        vk::BlendFactor::eOneMinusSrcAlpha, // destination color blend factor
+        vk::BlendOp::eAdd,                  // color blend operation
+        vk::BlendFactor::eOne,              // source alpha blend factor
+        vk::BlendFactor::eZero,             // destination alpha blend factor
+        vk::BlendOp::eAdd,                  // alpha blend factor
+        CComponent::eR | CComponent::eG | CComponent::eB | CComponent::eA,
     };
 
     vk::PipelineColorBlendStateCreateInfo colorBlendingInfo = {
-        {},
-        vk::False,
+        {}, // flags
+        vk::False, // enable logic operations
         vk::LogicOp::eCopy,
         colorBlendAttachment,
         {
-         0.0f, 0.0f,
-         0.0f, 0.0f,
-         },
+         0.0f, // blending constant/factor 1
+            0.0f, // blending constant/factor 2
+            0.0f, // blending constant/factor 3
+            0.0f, // blending constant/factor 4
+        },
     };
 
     vk::PipelineLayoutCreateInfo pipelineLayoutInfo = {{}, {}};
@@ -545,13 +551,11 @@ VKAPI_ATTR VkBool32 VKAPI_CALL Application::vulkanValidationlayerCallback(
     void* pUserData
 ) {
     switch (static_cast<vk::DebugUtilsMessageSeverityFlagBitsEXT>(messageSeverity)) {
-        case vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning: std::cerr << "[Vulkan][Warning] ";
-        case vk::DebugUtilsMessageSeverityFlagBitsEXT::eError:
-            std::cerr << "[Vulkan][Error] ";
-            std::cerr << pCallbackData->pMessage << std::endl;
-            break;
-        case vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo:
-        case vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose: break;
+        using enum vk::DebugUtilsMessageSeverityFlagBitsEXT;
+        case eWarning: std::cerr << "[Vulkan][Warning] " << pCallbackData->pMessage << std::endl; break;
+        case eError:   std::cerr << "[Vulkan][Error] " << pCallbackData->pMessage << std::endl; break;
+        case eInfo:    break;
+        case eVerbose: break;
     }
 
     return vk::False;
