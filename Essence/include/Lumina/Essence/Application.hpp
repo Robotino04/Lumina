@@ -41,6 +41,8 @@ protected:
     vk::Format swapchainImageFormat;
     vk::Extent2D swapchainExtent;
 
+    vk::PipelineLayout pipelineLayout;
+
     Window window;
 
 private:
@@ -57,7 +59,9 @@ private:
     void CreateLogicalDevice();
     void CreateSwapchain();
     void CreateImageViews();
+    void CreateGraphicsPipeline();
 
+    vk::ShaderModule CreateShaderModule(std::vector<char> const& bytecode) const;
 
     std::vector<const char*> GetRequiredVulkanExtensions() const;
     std::vector<const char*> GetRequiredVulkanValidationLayers() const;

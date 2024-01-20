@@ -1,5 +1,6 @@
 #include "Lumina/Essence/Application.hpp"
 #include "Lumina/Essence/Platform.hpp"
+#include "Lumina/Essence/Utils/FileIO.hpp"
 
 #include <format>
 #include <iostream>
@@ -16,6 +17,8 @@ Application::Application(glm::ivec2 windowSize, std::string const& windowTitle)
     : Name(windowTitle), window(windowSize, windowTitle) {}
 Application::~Application() {
     std::cout << "Application shutting down...\n";
+
+    device.destroyPipelineLayout(pipelineLayout);
 
     for (auto view : swapchainImageViews) {
         device.destroyImageView(view);
@@ -36,6 +39,7 @@ void Application::Initialize() {
     CreateLogicalDevice();
     CreateSwapchain();
     CreateImageViews();
+    CreateGraphicsPipeline();
 
     std::cout << "Vulkan initialized\n";
     IsInitialized = true;
@@ -354,6 +358,125 @@ vk::Extent2D Application::ChooseSwapchainExtent(vk::SurfaceCapabilitiesKHR const
     extent.height =
         glm::clamp<uint32_t>(fbSize.y, capabilities.minImageExtent.height, capabilities.maxImageExtent.height);
     return extent;
+}
+void Application::CreateGraphicsPipeline() {
+    std::cout << "Creating graphics pipeline\n";
+    auto vertexCode = readBinaryFile("resources/shaders/shader.vert.spv");
+    auto fragmentCode = readBinaryFile("resources/shaders/shader.frag.spv");
+
+    auto vertexModule = CreateShaderModule(vertexCode);
+    auto fragmentModule = CreateShaderModule(fragmentCode);
+
+    vk::PipelineShaderStageCreateInfo vertexCreateInfo = {
+        {},
+        vk::ShaderStageFlagBits::eVertex,
+        vertexModule,
+        "main",
+    };
+    vk::PipelineShaderStageCreateInfo fragmentCreateInfo = {
+        {},
+        vk::ShaderStageFlagBits::eFragment,
+        fragmentModule,
+        "main",
+    };
+
+    device.destroyShaderModule(vertexModule);
+    device.destroyShaderModule(fragmentModule);
+
+    vk::PipelineVertexInputStateCreateInfo vertexInputInfo = {};
+    vk::PipelineInputAssemblyStateCreateInfo inputAssemblyInfo = {
+        {},
+        vk::PrimitiveTopology::eTriangleList,
+        vk::False,
+    };
+
+    vk::Viewport viewport = {
+        0.0f,
+        0.0f,
+        swapchainExtent.width,
+        swapchainExtent.height,
+        0.0f,
+        1.0f,
+    };
+    vk::Rect2D scissor = {
+        {0, 0},
+        swapchainExtent
+    };
+
+
+    std::vector<vk::DynamicState> dynamicStates = {
+        vk::DynamicState::eViewport,
+        vk::DynamicState::eScissor,
+    };
+
+    vk::PipelineDynamicStateCreateInfo dynamicStateCreateInfo = {{}, dynamicStates};
+
+    vk::PipelineViewportStateCreateInfo viewportInfo = {
+        {},
+        1,
+        nullptr,
+        1,
+        nullptr,
+    };
+
+    vk::PipelineRasterizationStateCreateInfo rasterizerInfo = {
+        {},
+        vk::False,
+        vk::False,
+        vk::PolygonMode::eFill,
+        vk::CullModeFlagBits::eBack,
+        vk::FrontFace::eClockwise,
+        vk::False,
+        0.0f,
+        0.0f,
+        0.0f,
+    };
+
+    vk::PipelineMultisampleStateCreateInfo multisampleInfo = {
+        {},
+        vk::SampleCountFlagBits::e1,
+        vk::False,
+        1.0f,
+        nullptr,
+        vk::False,
+        vk::False,
+    };
+
+    vk::PipelineColorBlendAttachmentState colorBlendAttachment = {
+        vk::False,
+        vk::BlendFactor::eSrcAlpha,
+        vk::BlendFactor::eOneMinusSrcAlpha,
+        vk::BlendOp::eAdd,
+        vk::BlendFactor::eOne,
+        vk::BlendFactor::eZero,
+        vk::BlendOp::eAdd,
+        vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB
+            | vk::ColorComponentFlagBits::eA,
+    };
+
+    vk::PipelineColorBlendStateCreateInfo colorBlendingInfo = {
+        {},
+        vk::False,
+        vk::LogicOp::eCopy,
+        colorBlendAttachment,
+        {
+         0.0f, 0.0f,
+         0.0f, 0.0f,
+         },
+    };
+
+    vk::PipelineLayoutCreateInfo pipelineLayoutInfo = {{}, {}};
+    pipelineLayout = device.createPipelineLayout(pipelineLayoutInfo);
+}
+
+vk::ShaderModule Application::CreateShaderModule(std::vector<char> const& bytecode) const {
+    vk::ShaderModuleCreateInfo createInfo = {
+        {},
+        bytecode.size(),
+        reinterpret_cast<const uint32_t*>(bytecode.data()),
+    };
+
+    return device.createShaderModule(createInfo);
 }
 
 void Application::Run() {
