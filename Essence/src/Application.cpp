@@ -370,16 +370,16 @@ void Application::CreateRenderPass() {
         {},                                       // flags
         swapchainImageFormat,                     // format
         vk::SampleCountFlagBits::e1,              // num samples
-        vk::AttachmentLoadOp::eLoad,             // what to do with color before rendering
+        vk::AttachmentLoadOp::eLoad,              // what to do with color before rendering
         vk::AttachmentStoreOp::eStore,            // what to do with color after rendering
         vk::AttachmentLoadOp::eDontCare,          // what to do with the stencil buffer before rendering
         vk::AttachmentStoreOp::eDontCare,         // what to do with the stencil buffer after rendering
-        vk::ImageLayout::eColorAttachmentOptimal,              // pixel layout before rendering
+        vk::ImageLayout::eColorAttachmentOptimal, // pixel layout before rendering
         vk::ImageLayout::eColorAttachmentOptimal, // pixel layout after rendering
     };
 
     vk::AttachmentReference colorAttachmentRef = {
-        {},                                       // flags
+        {},                        // flags
         vk::ImageLayout::eGeneral, // image layout
     };
 
@@ -423,8 +423,7 @@ void Application::CreateGraphicsPipeline() {
         "main",
     };
 
-    device.destroyShaderModule(vertexModule);
-    device.destroyShaderModule(fragmentModule);
+    std::vector<vk::PipelineShaderStageCreateInfo> shaderStages = {vertexCreateInfo, fragmentCreateInfo};
 
     vk::PipelineVertexInputStateCreateInfo vertexInputInfo = {};
     vk::PipelineInputAssemblyStateCreateInfo inputAssemblyInfo = {
@@ -512,6 +511,28 @@ void Application::CreateGraphicsPipeline() {
 
     vk::PipelineLayoutCreateInfo pipelineLayoutInfo = {{}, {}};
     pipelineLayout = device.createPipelineLayout(pipelineLayoutInfo);
+
+    vk::GraphicsPipelineCreateInfo pipelineInfo = {
+        {},                      // flags
+        shaderStages,            // shader stages
+        &vertexInputInfo,        // vertex stage
+        &inputAssemblyInfo,      // input assembly stage
+        nullptr,                 // tesselation stage
+        &viewportInfo,           // viewport
+        &rasterizerInfo,         // rasterization stage
+        &multisampleInfo,        // multisampler
+        nullptr,                 // depth stencil
+        &colorBlendingInfo,      // color bleeding
+        &dynamicStateCreateInfo, // dynamic state
+        pipelineLayout,          // pipeline layout
+        renderPass,              // render pass
+        0,                       // subpass index
+        nullptr,                 // old pipeline
+        -1,                      // old pipeline index
+    };
+
+    device.destroyShaderModule(vertexModule);
+    device.destroyShaderModule(fragmentModule);
 }
 
 vk::ShaderModule Application::CreateShaderModule(std::vector<char> const& bytecode) const {
