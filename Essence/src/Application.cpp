@@ -18,6 +18,7 @@ Application::Application(glm::ivec2 windowSize, std::string const& windowTitle)
 Application::~Application() {
     std::cout << "Application shutting down...\n";
 
+    device.destroyRenderPass(renderPass);
     device.destroyPipelineLayout(pipelineLayout);
 
     for (auto view : swapchainImageViews) {
@@ -39,6 +40,7 @@ void Application::Initialize() {
     CreateLogicalDevice();
     CreateSwapchain();
     CreateImageViews();
+    CreateRenderPass();
     CreateGraphicsPipeline();
 
     std::cout << "Vulkan initialized\n";
@@ -363,6 +365,43 @@ vk::Extent2D Application::ChooseSwapchainExtent(vk::SurfaceCapabilitiesKHR const
         glm::clamp<uint32_t>(fbSize.y, capabilities.minImageExtent.height, capabilities.maxImageExtent.height);
     return extent;
 }
+void Application::CreateRenderPass() {
+    vk::AttachmentDescription colorAttachment = {
+        {},                                       // flags
+        swapchainImageFormat,                     // format
+        vk::SampleCountFlagBits::e1,              // num samples
+        vk::AttachmentLoadOp::eLoad,             // what to do with color before rendering
+        vk::AttachmentStoreOp::eStore,            // what to do with color after rendering
+        vk::AttachmentLoadOp::eDontCare,          // what to do with the stencil buffer before rendering
+        vk::AttachmentStoreOp::eDontCare,         // what to do with the stencil buffer after rendering
+        vk::ImageLayout::eColorAttachmentOptimal,              // pixel layout before rendering
+        vk::ImageLayout::eColorAttachmentOptimal, // pixel layout after rendering
+    };
+
+    vk::AttachmentReference colorAttachmentRef = {
+        {},                                       // flags
+        vk::ImageLayout::eGeneral, // image layout
+    };
+
+    std::vector<vk::AttachmentReference> attachmentRefs = {colorAttachmentRef};
+    std::vector<vk::AttachmentDescription> attachments = {colorAttachment};
+
+    vk::SubpassDescription subpass = {
+        {},                               // flags
+        vk::PipelineBindPoint::eGraphics, // use for graphics
+        attachmentRefs,                   // all attachments
+    };
+    std::vector<vk::SubpassDescription> subpasses = {subpass};
+
+
+    vk::RenderPassCreateInfo renderPassInfo = {
+        {},          // flags
+        attachments, // all attachments
+        subpasses,   // all subpasses
+    };
+    renderPass = device.createRenderPass(renderPassInfo);
+}
+
 void Application::CreateGraphicsPipeline() {
     std::cout << "Creating graphics pipeline\n";
     auto vertexCode = readBinaryFile("resources/shaders/shader.vert.spv");

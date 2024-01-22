@@ -42,6 +42,7 @@ protected:
     vk::Extent2D swapchainExtent;
 
     vk::PipelineLayout pipelineLayout;
+    vk::RenderPass renderPass;
 
     Window window;
 
@@ -59,6 +60,7 @@ private:
     void CreateLogicalDevice();
     void CreateSwapchain();
     void CreateImageViews();
+    void CreateRenderPass();
     void CreateGraphicsPipeline();
 
     vk::ShaderModule CreateShaderModule(std::vector<char> const& bytecode) const;
