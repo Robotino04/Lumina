@@ -37,6 +37,7 @@ protected:
 
     std::vector<vk::Image> swapchainImages;
     std::vector<vk::ImageView> swapchainImageViews;
+    std::vector<vk::Framebuffer> swapchainFramebuffers;
 
     vk::Format swapchainImageFormat;
     vk::Extent2D swapchainExtent;
@@ -62,6 +63,8 @@ private:
     void CreateImageViews();
     void CreateRenderPass();
     void CreateGraphicsPipeline();
+    void CreateFramebuffers();
+    ;
 
     vk::ShaderModule CreateShaderModule(std::vector<char> const& bytecode) const;
 

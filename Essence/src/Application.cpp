@@ -18,6 +18,9 @@ Application::Application(glm::ivec2 windowSize, std::string const& windowTitle)
 Application::~Application() {
     std::cout << "Application shutting down...\n";
 
+    for (auto framebuffer : swapchainFramebuffers) {
+        device.destroyFramebuffer(framebuffer);
+    }
     device.destroyRenderPass(renderPass);
     device.destroyPipelineLayout(pipelineLayout);
 
@@ -42,6 +45,7 @@ void Application::Initialize() {
     CreateImageViews();
     CreateRenderPass();
     CreateGraphicsPipeline();
+    CreateFramebuffers();
 
     std::cout << "Vulkan initialized\n";
     IsInitialized = true;
@@ -226,7 +230,7 @@ void Application::CreateSwapchain() {
         surfaceFormat.colorSpace,                                  // color space
         swapchainExtent,                                           // size
         1,                                                         // num image layers
-        vk::ImageUsageFlagBits::eColorAttachment,                  // use for rendering
+        vk::ImageUsageFlagBits::eInputAttachment,                  // use for rendering
         sharingMode,                                               // sharing mode
         queueIndices,                                              // queues
         swapchainSupport.capabilities.currentTransform,            // transformations
@@ -533,6 +537,23 @@ void Application::CreateGraphicsPipeline() {
 
     device.destroyShaderModule(vertexModule);
     device.destroyShaderModule(fragmentModule);
+}
+void Application::CreateFramebuffers() {
+    swapchainFramebuffers.reserve(swapchainImageViews.size());
+    for (int i = 0; i < swapchainImageViews.size(); i++) {
+        std::vector<vk::ImageView> attachments = {swapchainImageViews.at(i)};
+
+        vk::FramebufferCreateInfo framebufferInfo = {
+            {},                     // flags
+            renderPass,             // render pass
+            attachments,            // attachments
+            swapchainExtent.width,  // width
+            swapchainExtent.height, // height
+            1,                      // num layers
+        };
+
+        swapchainFramebuffers.push_back(device.createFramebuffer(framebufferInfo));
+    }
 }
 
 vk::ShaderModule Application::CreateShaderModule(std::vector<char> const& bytecode) const {
