@@ -6,12 +6,11 @@ using namespace Lumina;
 
 class TrialGroundApplication : public Essence::Application {
 public:
-    TrialGroundApplication(): Application({800, 600}, "Lumina Trial Ground") {
-        std::cout << "Hi!\n";
-    }
+    TrialGroundApplication(): Application({800, 600}, "Trial Ground") {}
 
-    void Tick(float dt) override {
-        Application::Tick(dt);
+    void Initialize() override {
+        Application::Initialize();
+        std::cout << "Hello, World!\n";
     }
 
 private:

@@ -1,40 +1,28 @@
 #include "Lumina/Essence/Window.hpp"
+#include "Lumina/Essence/Utils/unimplemented.hpp"
 
 #include <iostream>
 
 namespace Lumina::Essence {
 
 Window::Window(glm::ivec2 size, std::string const& title) {
-    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-    glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
-
-    glfwHandle = glfwCreateWindow(size.x, size.y, title.c_str(), nullptr, nullptr);
+    window = SDL_CreateWindow(title.c_str(), size.x, size.y, 0);
 }
 
 Window::~Window() {
-    glfwDestroyWindow(glfwHandle);
+    SDL_DestroyWindow(window);
 }
 
 bool Window::ShouldClose() const {
-    return glfwWindowShouldClose(glfwHandle);
+    return false;
 }
-
 
 void Window::PollEvents() {
-    glfwPollEvents();
+    unimplemented();
 }
 
-vk::SurfaceKHR Window::CreateWindowSurface(vk::Instance instance) const {
-    VkSurfaceKHR surface;
-    if (glfwCreateWindowSurface(instance, glfwHandle, nullptr, &surface) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create window surface!");
-    }
-    return surface;
-}
-glm::ivec2 Window::GetFramebufferSize() const {
-    int width, height;
-    glfwGetFramebufferSize(glfwHandle, &width, &height);
-    return {width, height};
-}
+// vk::SurfaceKHR Window::CreateWindowSurface(vk::Instance instance) const {
+//     unimplemented();
+// }
 
 }
