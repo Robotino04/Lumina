@@ -18,10 +18,12 @@ Application::Application(glm::ivec2 windowSize, std::string const& windowTitle)
 Application::~Application() {
     std::cout << "Application shutting down...\n";
 
+    device.destroyCommandPool(commandPool);
     for (auto framebuffer : swapchainFramebuffers) {
         device.destroyFramebuffer(framebuffer);
     }
     device.destroyRenderPass(renderPass);
+    device.destroyPipeline(graphicsPipeline);
     device.destroyPipelineLayout(pipelineLayout);
 
     for (auto view : swapchainImageViews) {
@@ -46,6 +48,8 @@ void Application::Initialize() {
     CreateRenderPass();
     CreateGraphicsPipeline();
     CreateFramebuffers();
+    CreateCommandPool();
+    CreateCommandBuffer();
 
     std::cout << "Vulkan initialized\n";
     IsInitialized = true;
@@ -476,6 +480,7 @@ void Application::CreateGraphicsPipeline() {
         0.0f,                        // depth bias factor
         0.0f,                        // depth bias clamp
         0.0f,                        // dapth bias slope factor
+        1.0f,                        // line width
     };
 
     vk::PipelineMultisampleStateCreateInfo multisampleInfo = {
@@ -535,6 +540,8 @@ void Application::CreateGraphicsPipeline() {
         -1,                      // old pipeline index
     };
 
+    graphicsPipeline = device.createGraphicsPipelines(nullptr, {pipelineInfo}).value.at(0);
+
     device.destroyShaderModule(vertexModule);
     device.destroyShaderModule(fragmentModule);
 }
@@ -555,6 +562,24 @@ void Application::CreateFramebuffers() {
         swapchainFramebuffers.push_back(device.createFramebuffer(framebufferInfo));
     }
 }
+void Application::CreateCommandPool() {
+    QueueFamilyIndices queueFamilyIndices = GetQueueFamilyIndices(physicalDevice);
+
+    vk::CommandPoolCreateInfo poolInfo = {
+        {},                                       // flags
+        queueFamilyIndices.graphicsFamily.value() // queue family
+    };
+
+    commandPool = device.createCommandPool(poolInfo);
+}
+void Application::CreateCommandBuffer() {
+    vk::CommandBufferAllocateInfo allocInfo = {
+        commandPool,                      // command pool
+        vk::CommandBufferLevel::ePrimary, // buffer level
+        1,                                // num buffers
+    };
+    commandBuffer = device.allocateCommandBuffers(allocInfo).at(0);
+}
 
 vk::ShaderModule Application::CreateShaderModule(std::vector<char> const& bytecode) const {
     vk::ShaderModuleCreateInfo createInfo = {
@@ -565,6 +590,61 @@ vk::ShaderModule Application::CreateShaderModule(std::vector<char> const& byteco
 
     return device.createShaderModule(createInfo);
 }
+
+
+void Application::RecordCommandBuffer(vk::CommandBuffer commandBuffer, uint32_t imageIndex) {
+    commandBuffer.begin({
+        {},      // flags
+        nullptr, // ihneritance info
+    });
+
+    std::vector<vk::ClearValue> clearValues = {
+        {{0.0f, 0.0f, 0.0f, 1.0f}},
+    };
+    // clang-format off
+    commandBuffer.beginRenderPass(
+        vk::RenderPassBeginInfo{
+            renderPass,                           // render pass
+            swapchainFramebuffers.at(imageIndex), //  framebuffer
+            vk::Rect2D{
+                {0, 0},          // offset
+                swapchainExtent, // size
+            },
+            clearValues,
+        },
+        vk::SubpassContents::eInline
+    );
+    // clang-format on
+
+    commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, graphicsPipeline);
+    // clang-format off
+    commandBuffer.setViewport(
+        0,
+        {{
+            0.0f,                                       // x
+            0.0f,                                       // y
+            static_cast<float>(swapchainExtent.width),  // width
+            static_cast<float>(swapchainExtent.height), // height
+            0.0f,                                       // min depth
+            1.0f,                                       // max depth
+        }}
+    );
+    // clang-format on
+    // clang-format off
+    commandBuffer.setScissor(
+        0,
+        {{
+            {0, 0},           // offset
+            swapchainExtent, // extent
+        }}
+    );
+    // clang-format on
+
+    commandBuffer.draw(3, 1, 0, 0);
+    commandBuffer.endRenderPass();
+    commandBuffer.end();
+}
+
 
 void Application::Run() {
     if (!IsInitialized)

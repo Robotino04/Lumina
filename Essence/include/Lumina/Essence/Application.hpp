@@ -44,6 +44,10 @@ protected:
 
     vk::PipelineLayout pipelineLayout;
     vk::RenderPass renderPass;
+    vk::Pipeline graphicsPipeline;
+
+    vk::CommandPool commandPool;
+    vk::CommandBuffer commandBuffer;
 
     Window window;
 
@@ -64,7 +68,10 @@ private:
     void CreateRenderPass();
     void CreateGraphicsPipeline();
     void CreateFramebuffers();
-    ;
+    void CreateCommandPool();
+    void CreateCommandBuffer();
+
+    void RecordCommandBuffer(vk::CommandBuffer commandBuffer, uint32_t imageIndex);
 
     vk::ShaderModule CreateShaderModule(std::vector<char> const& bytecode) const;
 
