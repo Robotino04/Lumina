@@ -17,6 +17,10 @@ public:
     virtual void Initialize();
 
     virtual void Tick(float dt);
+    
+    virtual void PreRender(float dt);
+    virtual void Render(float dt);
+    virtual void PostRender(float dt);
 
     void Run();
     void Exit();
@@ -33,7 +37,7 @@ protected:
     vk::Device device;
 
     vk::Queue graphicsQueue;
-    std::optional<vk::Queue> presentQueue;
+    vk::Queue presentQueue;
 
     std::vector<vk::Image> swapchainImages;
     std::vector<vk::ImageView> swapchainImageViews;
@@ -49,7 +53,12 @@ protected:
     vk::CommandPool commandPool;
     vk::CommandBuffer commandBuffer;
 
+    vk::Semaphore imageAvailableSemaphore;
+    vk::Semaphore renderFinishedSemaphore;
+    vk::Fence inFlightFence;
+
     Window window;
+    uint32_t currentImageIndex;
 
 private:
     static VKAPI_ATTR VkBool32 VKAPI_CALL vulkanValidationlayerCallback(
@@ -70,6 +79,7 @@ private:
     void CreateFramebuffers();
     void CreateCommandPool();
     void CreateCommandBuffer();
+    void CreateSyncObjects();
 
     void RecordCommandBuffer(vk::CommandBuffer commandBuffer, uint32_t imageIndex);
 

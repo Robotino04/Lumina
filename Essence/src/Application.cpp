@@ -18,6 +18,10 @@ Application::Application(glm::ivec2 windowSize, std::string const& windowTitle)
 Application::~Application() {
     std::cout << "Application shutting down...\n";
 
+    device.destroyFence(inFlightFence);
+    device.destroySemaphore(renderFinishedSemaphore);
+    device.destroySemaphore(imageAvailableSemaphore);
+
     device.destroyCommandPool(commandPool);
     for (auto framebuffer : swapchainFramebuffers) {
         device.destroyFramebuffer(framebuffer);
@@ -50,6 +54,7 @@ void Application::Initialize() {
     CreateFramebuffers();
     CreateCommandPool();
     CreateCommandBuffer();
+    CreateSyncObjects();
 
     std::cout << "Vulkan initialized\n";
     IsInitialized = true;
@@ -227,16 +232,16 @@ void Application::CreateSwapchain() {
     vk::SharingMode sharingMode = needsSharing ? vk::SharingMode::eConcurrent : vk::SharingMode::eExclusive;
 
     vk::SwapchainCreateInfoKHR createInfo = {
-        {},                                                        // flags
-        surface,                                                   // surface
-        imageCount,                                                // num images
-        swapchainImageFormat,                                      // image format
-        surfaceFormat.colorSpace,                                  // color space
-        swapchainExtent,                                           // size
-        1,                                                         // num image layers
-        vk::ImageUsageFlagBits::eInputAttachment,                  // use for rendering
-        sharingMode,                                               // sharing mode
-        queueIndices,                                              // queues
+        {},                       // flags
+        surface,                  // surface
+        imageCount,               // num images
+        swapchainImageFormat,     // image format
+        surfaceFormat.colorSpace, // color space
+        swapchainExtent,          // size
+        1,                        // num image layers
+        vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eInputAttachment, // use for rendering
+        sharingMode,                                                                         // sharing mode
+        queueIndices,                                                                        // queues
         swapchainSupport.capabilities.currentTransform,            // transformations
         vk::CompositeAlphaFlagBitsKHR::eOpaque,                    // how to handle alpha channel
         ChooseSwapchainPresentMode(swapchainSupport.presentModes), // present mode
@@ -378,17 +383,17 @@ void Application::CreateRenderPass() {
         {},                                       // flags
         swapchainImageFormat,                     // format
         vk::SampleCountFlagBits::e1,              // num samples
-        vk::AttachmentLoadOp::eLoad,              // what to do with color before rendering
+        vk::AttachmentLoadOp::eClear,             // what to do with color before rendering
         vk::AttachmentStoreOp::eStore,            // what to do with color after rendering
         vk::AttachmentLoadOp::eDontCare,          // what to do with the stencil buffer before rendering
         vk::AttachmentStoreOp::eDontCare,         // what to do with the stencil buffer after rendering
-        vk::ImageLayout::eColorAttachmentOptimal, // pixel layout before rendering
+        vk::ImageLayout::eUndefined,              // pixel layout before rendering
         vk::ImageLayout::eColorAttachmentOptimal, // pixel layout after rendering
     };
 
     vk::AttachmentReference colorAttachmentRef = {
-        {},                        // flags
-        vk::ImageLayout::eGeneral, // image layout
+        0,                                        // attachment
+        vk::ImageLayout::eColorAttachmentOptimal, // image layout
     };
 
     std::vector<vk::AttachmentReference> attachmentRefs = {colorAttachmentRef};
@@ -401,11 +406,20 @@ void Application::CreateRenderPass() {
     };
     std::vector<vk::SubpassDescription> subpasses = {subpass};
 
+    vk::SubpassDependency dependency = {
+        vk::SubpassExternal,                               // src subpass
+        0,                                                 // dst subpass
+        vk::PipelineStageFlagBits::eColorAttachmentOutput, // src stage mask
+        vk::PipelineStageFlagBits::eColorAttachmentOutput, // dst stage mask
+        vk::AccessFlagBits::eNone,                         // src access mask
+        vk::AccessFlagBits::eColorAttachmentWrite,         // dst stage mask
+    };
 
     vk::RenderPassCreateInfo renderPassInfo = {
         {},          // flags
         attachments, // all attachments
         subpasses,   // all subpasses
+        dependency,  // subpass dependencies
     };
     renderPass = device.createRenderPass(renderPassInfo);
 }
@@ -566,8 +580,8 @@ void Application::CreateCommandPool() {
     QueueFamilyIndices queueFamilyIndices = GetQueueFamilyIndices(physicalDevice);
 
     vk::CommandPoolCreateInfo poolInfo = {
-        {},                                       // flags
-        queueFamilyIndices.graphicsFamily.value() // queue family
+        {vk::CommandPoolCreateFlagBits::eResetCommandBuffer}, // flags
+        queueFamilyIndices.graphicsFamily.value()             // queue family
     };
 
     commandPool = device.createCommandPool(poolInfo);
@@ -579,6 +593,11 @@ void Application::CreateCommandBuffer() {
         1,                                // num buffers
     };
     commandBuffer = device.allocateCommandBuffers(allocInfo).at(0);
+}
+void Application::CreateSyncObjects() {
+    imageAvailableSemaphore = device.createSemaphore({});
+    renderFinishedSemaphore = device.createSemaphore({});
+    inFlightFence = device.createFence({vk::FenceCreateFlagBits::eSignaled});
 }
 
 vk::ShaderModule Application::CreateShaderModule(std::vector<char> const& bytecode) const {
@@ -654,8 +673,13 @@ void Application::Run() {
         );
 
     IsRunning = true;
+    float dt = 1.0f / 60.0f;
     while (IsRunning) {
-        Tick(1 / 60.0f);
+        Tick(dt);
+
+        PreRender(dt);
+        Render(dt);
+        PostRender(dt);
     }
 }
 void Application::Exit() {
@@ -669,6 +693,38 @@ void Application::Tick(float dt) {
     if (window.ShouldClose()) {
         Exit();
     }
+}
+void Application::PreRender(float dt) {
+    device.waitForFences(inFlightFence, vk::True, UINT64_MAX);
+    device.resetFences(inFlightFence);
+
+    currentImageIndex = device.acquireNextImageKHR(swapchain, UINT64_MAX, imageAvailableSemaphore, nullptr).value;
+}
+void Application::Render(float dt) {
+    commandBuffer.reset();
+    RecordCommandBuffer(commandBuffer, currentImageIndex);
+}
+void Application::PostRender(float dt) {
+    std::vector<vk::PipelineStageFlags> waitStages = {vk::PipelineStageFlagBits::eColorAttachmentOutput};
+
+    // clang-format off
+    graphicsQueue.submit(
+        vk::SubmitInfo{
+            imageAvailableSemaphore,
+            waitStages,
+            commandBuffer,
+            renderFinishedSemaphore,
+        },
+        inFlightFence
+    );
+    // clang-format on
+
+    presentQueue.presentKHR(vk::PresentInfoKHR{
+        renderFinishedSemaphore, // wait for this semaphore
+        swapchain,               // swapchain
+        currentImageIndex,       // image to display
+        nullptr                  // results for error handling
+    });
 }
 
 std::vector<const char*> Application::GetRequiredVulkanExtensions() const {
