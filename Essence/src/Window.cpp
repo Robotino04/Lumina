@@ -1,6 +1,8 @@
 #include "Lumina/Essence/Window.hpp"
 #include "Lumina/Essence/Utils/unimplemented.hpp"
 
+#include <SDL3/SDL_vulkan.h>
+
 #include <iostream>
 
 namespace Lumina::Essence {
@@ -8,7 +10,7 @@ namespace Lumina::Essence {
 Window::Window(glm::ivec2 size, std::string const& title) {
     SDL_Init(SDL_INIT_VIDEO);
 
-    window = SDL_CreateWindow(title.c_str(), size.x, size.y, 0);
+    window = SDL_CreateWindow(title.c_str(), size.x, size.y, SDL_WINDOW_VULKAN);
 }
 
 Window::~Window() {
@@ -22,8 +24,12 @@ std::optional<SDL_Event> Window::GetEvent() {
 }
 
 
-// vk::SurfaceKHR Window::CreateWindowSurface(vk::Instance instance) const {
-//     unimplemented();
-// }
+vk::SurfaceKHR Window::CreateWindowSurface(vk::Instance instance) const {
+    VkSurfaceKHR surface;
+    if (SDL_Vulkan_CreateSurface(window, instance, nullptr, &surface) != SDL_TRUE) {
+        throw std::runtime_error(std::format("SDL Error: {}", SDL_GetError()));
+    }
+    return surface;
+}
 
 }

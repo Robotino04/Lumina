@@ -34,7 +34,31 @@ protected:
     Window window;
     uint32_t currentImageIndex;
 
+    vk::Instance instance;
+    vk::DebugUtilsMessengerEXT debugMessenger;
+    vk::PhysicalDevice physicalDevice;
+    vk::Device device;
+    vk::SurfaceKHR surface;
+
+    vk::SwapchainKHR swapchain;
+    vk::Format swapchainImageFormat;
+
+    std::vector<vk::Image> swapchainImages;
+    std::vector<vk::ImageView> swapchainImageViews;
+    vk::Extent2D swapchainExtent;
+
+
+    const std::string windowTitle;
+    const glm::ivec2 windowSize;
+
 private:
+    void InitVulkan();
+    void InitSwapchain();
+    void InitCommands();
+    void InitSyncObjects();
+
+    void CreateSwapchain(glm::ivec2 size);
+
     bool IsRunning = false;
     bool IsInitialized = false;
     bool IsRenderingEnabled = true;

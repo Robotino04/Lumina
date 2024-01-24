@@ -18,7 +18,7 @@ public:
 
     std::optional<SDL_Event> GetEvent();
 
-    // vk::SurfaceKHR CreateWindowSurface(vk::Instance instance) const;
+    vk::SurfaceKHR CreateWindowSurface(vk::Instance instance) const;
 
 private:
     struct SDL_Window* window;
