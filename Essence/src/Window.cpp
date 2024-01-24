@@ -6,20 +6,21 @@
 namespace Lumina::Essence {
 
 Window::Window(glm::ivec2 size, std::string const& title) {
+    SDL_Init(SDL_INIT_VIDEO);
+
     window = SDL_CreateWindow(title.c_str(), size.x, size.y, 0);
 }
 
 Window::~Window() {
     SDL_DestroyWindow(window);
+    SDL_Quit();
 }
 
-bool Window::ShouldClose() const {
-    return false;
+std::optional<SDL_Event> Window::GetEvent() {
+    SDL_Event e;
+    return SDL_PollEvent(&e) != 0 ? e : std::optional<SDL_Event>{};
 }
 
-void Window::PollEvents() {
-    unimplemented();
-}
 
 // vk::SurfaceKHR Window::CreateWindowSurface(vk::Instance instance) const {
 //     unimplemented();

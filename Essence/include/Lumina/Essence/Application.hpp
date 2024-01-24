@@ -23,6 +23,8 @@ public:
     virtual void Render(float dt);
     virtual void PostRender(float dt);
 
+    virtual void HandleEvent(SDL_Event e);
+
     void Run();
     void Exit();
 
@@ -35,6 +37,7 @@ protected:
 private:
     bool IsRunning = false;
     bool IsInitialized = false;
+    bool IsRenderingEnabled = true;
 };
 
 }

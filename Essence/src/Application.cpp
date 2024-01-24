@@ -3,6 +3,8 @@
 #include "Lumina/Essence/Utils/FileIO.hpp"
 
 #include <iostream>
+#include <chrono>
+#include <thread>
 
 namespace Lumina::Essence {
 
@@ -30,7 +32,17 @@ void Application::Run() {
     IsRunning = true;
     float dt = 1.0f / 60.0f;
     while (IsRunning) {
+        while (auto e = window.GetEvent()) {
+            HandleEvent(e.value());
+        }
+
         Tick(dt);
+
+        if (!IsRenderingEnabled) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            continue;
+        }
+
 
         PreRender(dt);
         Render(dt);
@@ -42,15 +54,16 @@ void Application::Exit() {
 }
 
 
-void Application::Tick(float dt) {
-    window.PollEvents();
-
-    if (window.ShouldClose()) {
-        Exit();
-    }
-}
+void Application::Tick(float dt) {}
 void Application::PreRender(float dt) {}
 void Application::Render(float dt) {}
 void Application::PostRender(float dt) {}
+void Application::HandleEvent(SDL_Event e) {
+    switch (e.type) {
+        case SDL_EventType::SDL_EVENT_QUIT:             Exit(); break;
+        case SDL_EventType::SDL_EVENT_WINDOW_MINIMIZED: IsRenderingEnabled = false; break;
+        case SDL_EventType::SDL_EVENT_WINDOW_MAXIMIZED: IsRenderingEnabled = true; break;
+    }
+}
 
 }

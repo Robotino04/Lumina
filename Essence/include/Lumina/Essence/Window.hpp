@@ -7,6 +7,7 @@
 #include <glm/glm.hpp>
 
 #include <string>
+#include <optional>
 
 namespace Lumina::Essence {
 
@@ -15,9 +16,7 @@ public:
     Window(glm::ivec2 size, std::string const& title);
     ~Window();
 
-    bool ShouldClose() const;
-
-    void PollEvents();
+    std::optional<SDL_Event> GetEvent();
 
     // vk::SurfaceKHR CreateWindowSurface(vk::Instance instance) const;
 

@@ -4,3 +4,6 @@
 [submodule "libraries/SDL"]
 	path = libraries/SDL
 	url = git@github.com:libsdl-org/SDL.git
+[submodule "libraries/vk-bootstrap"]
+	path = libraries/vk-bootstrap
+	url = https://github.com/charles-lunarg/vk-bootstrap
