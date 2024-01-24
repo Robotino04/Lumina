@@ -15,6 +15,11 @@ Application::Application(glm::ivec2 windowSize, std::string const& windowTitle)
 Application::~Application() {
     std::cout << "Application shutting down...\n";
 
+    device.waitIdle();
+
+    for (auto& frame : frames) {
+        device.destroyCommandPool(frame.commandPool);
+    }
 
     for (auto imageView : swapchainImageViews) {
         device.destroyImageView(imageView);
@@ -82,6 +87,10 @@ void Application::InitVulkan() {
 
     device = vkbDevice.device;
     physicalDevice = vkbPhysicalDevice.physical_device;
+    graphicsQueue = vkbDevice.get_queue(vkb::QueueType::graphics).value();
+    graphicsQueueFamily = vkbDevice.get_queue_index(vkb::QueueType::graphics).value();
+
+    std::cout << "Using " << physicalDevice.getProperties().deviceName << "\n";
 
     std::cout << "Vulkan initialized\n";
 }
@@ -95,6 +104,20 @@ void Application::InitSwapchain() {
 
 void Application::InitCommands() {
     std::cout << "Initializing commands\n";
+
+    vk::CommandPoolCreateInfo commandPoolInfo = {{vk::CommandPoolCreateFlagBits::eResetCommandBuffer}, graphicsQueueFamily};
+    for (auto& frame : frames) {
+        frame.commandPool = device.createCommandPool(commandPoolInfo);
+
+        frame.mainCommandBuffer = device
+                                      .allocateCommandBuffers({
+                                          frame.commandPool,                // command pool
+                                          vk::CommandBufferLevel::ePrimary, // command buffer level
+                                          1,                                // num buffers
+                                      })
+                                      .at(0);
+    }
+
     std::cout << "Commands initialized\n";
 }
 void Application::InitSyncObjects() {

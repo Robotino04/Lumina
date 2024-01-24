@@ -8,6 +8,7 @@
 
 #include <vector>
 #include <string>
+#include <array>
 
 namespace Lumina::Essence {
 
@@ -31,6 +32,13 @@ public:
     const std::string Name;
 
 protected:
+    struct FrameData {
+        vk::CommandPool commandPool;
+        vk::CommandBuffer mainCommandBuffer;
+    };
+
+    std::array<FrameData, 2> frames;
+
     Window window;
     uint32_t currentImageIndex;
 
@@ -59,9 +67,18 @@ private:
 
     void CreateSwapchain(glm::ivec2 size);
 
+    FrameData& GetCurrentFrame() {
+        return frames.at(currentFrame % frames.size());
+    }
+
     bool IsRunning = false;
     bool IsInitialized = false;
     bool IsRenderingEnabled = true;
+
+    uint32_t currentFrame = 0;
+
+    vk::Queue graphicsQueue;
+    uint32_t graphicsQueueFamily;
 };
 
 }
