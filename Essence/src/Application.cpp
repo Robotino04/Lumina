@@ -3,6 +3,7 @@
 #include "Lumina/Essence/Utils/FileIO.hpp"
 
 #include <VkBootstrap.h>
+#include <glm/glm.hpp>
 
 #include <iostream>
 #include <chrono>
@@ -19,6 +20,9 @@ Application::~Application() {
 
     for (auto& frame : frames) {
         device.destroyCommandPool(frame.commandPool);
+        device.destroySemaphore(frame.renderSemaphore);
+        device.destroySemaphore(frame.swapchainSemaphore);
+        device.destroyFence(frame.renderFence);
     }
 
     for (auto imageView : swapchainImageViews) {
@@ -122,6 +126,16 @@ void Application::InitCommands() {
 }
 void Application::InitSyncObjects() {
     std::cout << "Initializing sync objects\n";
+
+    vk::SemaphoreCreateInfo semaphoreInfo = {};
+    vk::FenceCreateInfo fenceInfo = {{vk::FenceCreateFlagBits::eSignaled}};
+
+    for (auto& frame : frames) {
+        frame.renderSemaphore = device.createSemaphore(semaphoreInfo);
+        frame.swapchainSemaphore = device.createSemaphore(semaphoreInfo);
+        frame.renderFence = device.createFence(fenceInfo);
+    }
+
     std::cout << "Sync objects initialized\n";
 }
 
@@ -148,6 +162,45 @@ void Application::CreateSwapchain(glm::ivec2 size) {
     auto imageViews = vkbSwapchain.get_image_views().value();
     for (auto imgView : imageViews)
         swapchainImageViews.push_back(imgView);
+}
+
+void Application::TransitionImage(vk::CommandBuffer cmd, vk::Image img, vk::ImageLayout oldLayout, vk::ImageLayout newLayout) {
+    vk::ImageAspectFlags aspectMask = (newLayout == vk::ImageLayout::eDepthAttachmentOptimal)
+                                        ? vk::ImageAspectFlagBits::eDepth
+                                        : vk::ImageAspectFlagBits::eColor;
+
+    // clang-format off
+    vk::ImageMemoryBarrier2 imageBarrier = {
+        vk::PipelineStageFlagBits2::eAllCommands,                             // source stage mask
+        vk::AccessFlagBits2::eMemoryWrite,                                    // source access mask
+        vk::PipelineStageFlagBits2::eAllCommands,                             // destination stage mask
+        vk::AccessFlagBits2::eMemoryWrite | vk::AccessFlagBits2::eMemoryRead, // destination access mask
+        oldLayout,                                                            // current layout
+        newLayout,                                                            // new layout
+        0,                                                                    // source queue family index
+        0,                                                                    // dest queue family index
+        img,
+        CreateSubresourceRangeForAllLayers(aspectMask)
+    };
+    // clang-format on
+
+    vk::DependencyInfo dependencyInfo = {
+        {},           // flags
+        nullptr,      // memory barriers
+        nullptr,      // buffer barriers
+        imageBarrier, // image barriers
+    };
+
+    cmd.pipelineBarrier2(dependencyInfo);
+}
+vk::ImageSubresourceRange Application::CreateSubresourceRangeForAllLayers(vk::ImageAspectFlags aspectMask) {
+    return {
+        aspectMask,
+        0,                        // base mip level
+        vk::RemainingMipLevels,   // num mip levels
+        0,                        // base layer
+        vk::RemainingArrayLayers, // num layers
+    };
 }
 
 
@@ -184,9 +237,54 @@ void Application::Exit() {
 
 
 void Application::Tick(float dt) {}
-void Application::PreRender(float dt) {}
+
+void Application::PreRender(float dt) {
+    device.waitForFences(GetCurrentFrame().renderFence, true, UINT64_MAX);
+    device.resetFences(GetCurrentFrame().renderFence);
+
+    currentSwapchainImageIndex =
+        device.acquireNextImageKHR(swapchain, UINT64_MAX, GetCurrentFrame().swapchainSemaphore, nullptr).value;
+
+    vk::CommandBuffer cmd = GetCurrentFrame().mainCommandBuffer;
+    cmd.reset();
+    cmd.begin({{vk::CommandBufferUsageFlagBits::eOneTimeSubmit}});
+
+    TransitionImage(cmd, swapchainImages[currentSwapchainImageIndex], vk::ImageLayout::eUndefined, vk::ImageLayout::eGeneral);
+
+    // make a clear-color from frame number. This will flash with a 120 frame period.
+    float flash = glm::abs(glm::sin(float(currentFrame) / 120.0f));
+    vk::ClearColorValue clearValue(0.0f, 0.0f, flash, 1.0f);
+
+    vk::ImageSubresourceRange clearRange = CreateSubresourceRangeForAllLayers(vk::ImageAspectFlagBits::eColor);
+
+    // clear image
+    cmd.clearColorImage(swapchainImages[currentSwapchainImageIndex], vk::ImageLayout::eGeneral, clearValue, clearRange);
+}
 void Application::Render(float dt) {}
-void Application::PostRender(float dt) {}
+void Application::PostRender(float dt) {
+    vk::CommandBuffer cmd = GetCurrentFrame().mainCommandBuffer;
+
+    TransitionImage(cmd, swapchainImages[currentSwapchainImageIndex], vk::ImageLayout::eGeneral, vk::ImageLayout::ePresentSrcKHR);
+    cmd.end();
+
+    vk::CommandBufferSubmitInfo submitInfo = {cmd};
+
+    vk::SemaphoreSubmitInfo waitInfo = {GetCurrentFrame().swapchainSemaphore, 1, vk::PipelineStageFlagBits2KHR::eColorAttachmentOutput};
+    vk::SemaphoreSubmitInfo signalInfo = {GetCurrentFrame().renderSemaphore, 1, vk::PipelineStageFlagBits2KHR::eAllGraphics};
+
+    vk::SubmitInfo2 submit = {{}, waitInfo, submitInfo, signalInfo};
+
+    graphicsQueue.submit2(submit, GetCurrentFrame().renderFence);
+
+    vk::PresentInfoKHR presentInfo = {
+        GetCurrentFrame().renderSemaphore,
+        swapchain,
+        currentSwapchainImageIndex,
+    };
+
+    graphicsQueue.presentKHR(presentInfo);
+    currentFrame++;
+}
 void Application::HandleEvent(SDL_Event e) {
     switch (e.type) {
         case SDL_EventType::SDL_EVENT_QUIT:             Exit(); break;

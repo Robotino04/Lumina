@@ -35,6 +35,9 @@ protected:
     struct FrameData {
         vk::CommandPool commandPool;
         vk::CommandBuffer mainCommandBuffer;
+
+        vk::Semaphore renderSemaphore, swapchainSemaphore;
+        vk::Fence renderFence;
     };
 
     std::array<FrameData, 2> frames;
@@ -67,15 +70,19 @@ private:
 
     void CreateSwapchain(glm::ivec2 size);
 
-    FrameData& GetCurrentFrame() {
+    inline FrameData& GetCurrentFrame() {
         return frames.at(currentFrame % frames.size());
     }
+
+    static void TransitionImage(vk::CommandBuffer cmd, vk::Image img, vk::ImageLayout srcLayout, vk::ImageLayout dstLayout);
+    static vk::ImageSubresourceRange CreateSubresourceRangeForAllLayers(vk::ImageAspectFlags aspect);
 
     bool IsRunning = false;
     bool IsInitialized = false;
     bool IsRenderingEnabled = true;
 
     uint32_t currentFrame = 0;
+    uint32_t currentSwapchainImageIndex = 0;
 
     vk::Queue graphicsQueue;
     uint32_t graphicsQueueFamily;
