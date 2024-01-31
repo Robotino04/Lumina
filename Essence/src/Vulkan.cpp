@@ -1,3 +1,4 @@
+#define VMA_IMPLEMENTATION
 #include "Lumina/Essence/Vulkan.hpp"
 
 #if VULKAN_HPP_DISPATCH_LOADER_DYNAMIC == 1

@@ -18,23 +18,7 @@ Application::~Application() {
 
     device.waitIdle();
 
-    for (auto& frame : frames) {
-        device.destroyCommandPool(frame.commandPool);
-        device.destroySemaphore(frame.renderSemaphore);
-        device.destroySemaphore(frame.swapchainSemaphore);
-        device.destroyFence(frame.renderFence);
-    }
-
-    for (auto imageView : swapchainImageViews) {
-        device.destroyImageView(imageView);
-    }
-    device.destroySwapchainKHR(swapchain);
-
-    instance.destroySurfaceKHR(surface);
-    device.destroy();
-
-    instance.destroyDebugUtilsMessengerEXT(debugMessenger);
-    instance.destroy();
+    mainDeletionQueue.Flush();
 }
 
 void Application::Initialize() {
@@ -65,10 +49,17 @@ void Application::InitVulkan() {
                                     .value();
 
     instance = vkbInstance.instance;
+    mainDeletionQueue.PushBack([&]() { instance.destroy(); }, "instance");
     VULKAN_HPP_DEFAULT_DISPATCHER.init(instance);
+
     debugMessenger = vkbInstance.debug_messenger;
+    mainDeletionQueue.PushBack(
+        [&]() { instance.destroyDebugUtilsMessengerEXT(debugMessenger); },
+        "debug messenger"
+    );
 
     surface = window.CreateWindowSurface(instance);
+    mainDeletionQueue.PushBack([&]() { instance.destroySurfaceKHR(surface); }, "surface");
 
     vk::PhysicalDeviceVulkan12Features features12;
     features12.bufferDeviceAddress = true;
@@ -90,11 +81,20 @@ void Application::InitVulkan() {
     vkb::Device vkbDevice = deviceBuilder.build().value();
 
     device = vkbDevice.device;
+    mainDeletionQueue.PushBack([&]() { device.destroy(); }, "logical device");
     physicalDevice = vkbPhysicalDevice.physical_device;
     graphicsQueue = vkbDevice.get_queue(vkb::QueueType::graphics).value();
     graphicsQueueFamily = vkbDevice.get_queue_index(vkb::QueueType::graphics).value();
 
     std::cout << "Using " << physicalDevice.getProperties().deviceName << "\n";
+
+    VmaAllocatorCreateInfo allocatorInfo = {};
+    allocatorInfo.physicalDevice = physicalDevice;
+    allocatorInfo.device = device;
+    allocatorInfo.instance = instance;
+    allocatorInfo.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
+    vmaCreateAllocator(&allocatorInfo, &allocator);
+    mainDeletionQueue.PushBack([&]() { vmaDestroyAllocator(allocator); }, "allocator");
 
     std::cout << "Vulkan initialized\n";
 }
@@ -110,8 +110,11 @@ void Application::InitCommands() {
     std::cout << "Initializing commands\n";
 
     vk::CommandPoolCreateInfo commandPoolInfo = {{vk::CommandPoolCreateFlagBits::eResetCommandBuffer}, graphicsQueueFamily};
+    int i = 0;
     for (auto& frame : frames) {
         frame.commandPool = device.createCommandPool(commandPoolInfo);
+
+        mainDeletionQueue.PushBack([=, this]() { device.destroyCommandPool(frame.commandPool); }, std::format("command pool F{}", i));
 
         frame.mainCommandBuffer = device
                                       .allocateCommandBuffers({
@@ -120,6 +123,7 @@ void Application::InitCommands() {
                                           1,                                // num buffers
                                       })
                                       .at(0);
+        i++;
     }
 
     std::cout << "Commands initialized\n";
@@ -130,10 +134,21 @@ void Application::InitSyncObjects() {
     vk::SemaphoreCreateInfo semaphoreInfo = {};
     vk::FenceCreateInfo fenceInfo = {{vk::FenceCreateFlagBits::eSignaled}};
 
+    int i = 0;
     for (auto& frame : frames) {
         frame.renderSemaphore = device.createSemaphore(semaphoreInfo);
         frame.swapchainSemaphore = device.createSemaphore(semaphoreInfo);
         frame.renderFence = device.createFence(fenceInfo);
+
+        mainDeletionQueue.PushBack(
+            [&, i=i]() {
+                device.destroySemaphore(frame.renderSemaphore);
+                device.destroySemaphore(frame.swapchainSemaphore);
+                device.destroyFence(frame.renderFence);
+            },
+            std::format("sync objects F{}", i)
+        );
+        i++;
     }
 
     std::cout << "Sync objects initialized\n";
@@ -155,13 +170,19 @@ void Application::CreateSwapchain(glm::ivec2 size) {
                                       .value();
     swapchainExtent = vkbSwapchain.extent;
     swapchain = vkbSwapchain.swapchain;
+    mainDeletionQueue.PushBack([&]() { device.destroySwapchainKHR(swapchain); }, "swapchain");
+
     auto images = vkbSwapchain.get_images().value();
     for (auto img : images)
         swapchainImages.push_back(img);
 
     auto imageViews = vkbSwapchain.get_image_views().value();
-    for (auto imgView : imageViews)
+    int i = 0;
+    for (auto imgView : imageViews) {
         swapchainImageViews.push_back(imgView);
+        mainDeletionQueue.PushBack([=, this]() { device.destroyImageView(imgView); }, std::format("image view F{}", i));
+        i++;
+    }
 }
 
 void Application::TransitionImage(vk::CommandBuffer cmd, vk::Image img, vk::ImageLayout oldLayout, vk::ImageLayout newLayout) {
@@ -240,6 +261,8 @@ void Application::Tick(float dt) {}
 
 void Application::PreRender(float dt) {
     device.waitForFences(GetCurrentFrame().renderFence, true, UINT64_MAX);
+    GetCurrentFrame().deletionQueue.Flush();
+
     device.resetFences(GetCurrentFrame().renderFence);
 
     currentSwapchainImageIndex =

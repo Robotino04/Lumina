@@ -3,6 +3,7 @@
 #include "Lumina/Essence/Utils/NonCopyable.hpp"
 #include "Lumina/Essence/Vulkan.hpp"
 #include "Lumina/Essence/Window.hpp"
+#include "Lumina/Essence/DeletionQueue.hpp"
 
 #include <glm/glm.hpp>
 
@@ -38,6 +39,8 @@ protected:
 
         vk::Semaphore renderSemaphore, swapchainSemaphore;
         vk::Fence renderFence;
+
+        DeletionQueue deletionQueue;
     };
 
     std::array<FrameData, 2> frames;
@@ -57,6 +60,10 @@ protected:
     std::vector<vk::Image> swapchainImages;
     std::vector<vk::ImageView> swapchainImageViews;
     vk::Extent2D swapchainExtent;
+
+    DeletionQueue mainDeletionQueue;
+
+    VmaAllocator allocator;
 
 
     const std::string windowTitle;
