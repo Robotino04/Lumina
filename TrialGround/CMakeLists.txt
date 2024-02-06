@@ -12,7 +12,7 @@ add_custom_target(
 # ----------------| Shader Compilation |---------------- #
 
 # find all shaders
-file(GLOB_RECURSE TRIAL_GROUND_SHADERS_SRC "${TRIAL_GROUND_RESOURCE_SOURCE}/shaders/*.vert" "${TRIAL_GROUND_RESOURCE_SOURCE}/shaders/*.frag")
+file(GLOB_RECURSE TRIAL_GROUND_SHADERS_SRC "${TRIAL_GROUND_RESOURCE_SOURCE}/shaders/*.vert" "${TRIAL_GROUND_RESOURCE_SOURCE}/shaders/*.frag" "${TRIAL_GROUND_RESOURCE_SOURCE}/shaders/*.comp")
 
 set(TRIAL_GROUND_SHADER_BINARIES)
 
