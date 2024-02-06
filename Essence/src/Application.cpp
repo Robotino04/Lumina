@@ -103,6 +103,23 @@ void Application::InitSwapchain() {
 
     CreateSwapchain(windowSize);
 
+    vk::Extent3D drawImageExtent = {
+        windowSize.x,
+        windowSize.y,
+        1,
+    };
+
+    using enum vk::ImageUsageFlagBits;
+    drawImage = VulkanImage(
+        *this,
+        vk::Format::eR16G16B16A16Sfloat,
+        eTransferSrc | eTransferDst | eStorage | eColorAttachment,
+        drawImageExtent,
+        vk::ImageAspectFlagBits::eColor
+    );
+
+    mainDeletionQueue.PushBack([&]() { drawImage.Destroy(); }, "draw image");
+
     std::cout << "Swapchain initialized\n";
 }
 
@@ -141,7 +158,7 @@ void Application::InitSyncObjects() {
         frame.renderFence = device.createFence(fenceInfo);
 
         mainDeletionQueue.PushBack(
-            [&, i=i]() {
+            [&, i = i]() {
                 device.destroySemaphore(frame.renderSemaphore);
                 device.destroySemaphore(frame.swapchainSemaphore);
                 device.destroyFence(frame.renderFence);
@@ -184,46 +201,6 @@ void Application::CreateSwapchain(glm::ivec2 size) {
         i++;
     }
 }
-
-void Application::TransitionImage(vk::CommandBuffer cmd, vk::Image img, vk::ImageLayout oldLayout, vk::ImageLayout newLayout) {
-    vk::ImageAspectFlags aspectMask = (newLayout == vk::ImageLayout::eDepthAttachmentOptimal)
-                                        ? vk::ImageAspectFlagBits::eDepth
-                                        : vk::ImageAspectFlagBits::eColor;
-
-    // clang-format off
-    vk::ImageMemoryBarrier2 imageBarrier = {
-        vk::PipelineStageFlagBits2::eAllCommands,                             // source stage mask
-        vk::AccessFlagBits2::eMemoryWrite,                                    // source access mask
-        vk::PipelineStageFlagBits2::eAllCommands,                             // destination stage mask
-        vk::AccessFlagBits2::eMemoryWrite | vk::AccessFlagBits2::eMemoryRead, // destination access mask
-        oldLayout,                                                            // current layout
-        newLayout,                                                            // new layout
-        0,                                                                    // source queue family index
-        0,                                                                    // dest queue family index
-        img,
-        CreateSubresourceRangeForAllLayers(aspectMask)
-    };
-    // clang-format on
-
-    vk::DependencyInfo dependencyInfo = {
-        {},           // flags
-        nullptr,      // memory barriers
-        nullptr,      // buffer barriers
-        imageBarrier, // image barriers
-    };
-
-    cmd.pipelineBarrier2(dependencyInfo);
-}
-vk::ImageSubresourceRange Application::CreateSubresourceRangeForAllLayers(vk::ImageAspectFlags aspectMask) {
-    return {
-        aspectMask,
-        0,                        // base mip level
-        vk::RemainingMipLevels,   // num mip levels
-        0,                        // base layer
-        vk::RemainingArrayLayers, // num layers
-    };
-}
-
 
 void Application::Run() {
     if (!IsInitialized)
@@ -272,7 +249,11 @@ void Application::PreRender(float dt) {
     cmd.reset();
     cmd.begin({{vk::CommandBufferUsageFlagBits::eOneTimeSubmit}});
 
-    TransitionImage(cmd, swapchainImages[currentSwapchainImageIndex], vk::ImageLayout::eUndefined, vk::ImageLayout::eGeneral);
+    VulkanImage::Transition(cmd, drawImage, vk::ImageLayout::eUndefined, vk::ImageLayout::eGeneral);
+}
+
+void Application::Render(float dt) {
+    vk::CommandBuffer cmd = GetCurrentFrame().mainCommandBuffer;
 
     // make a clear-color from frame number. This will flash with a 120 frame period.
     float flash = glm::abs(glm::sin(float(currentFrame) / 120.0f));
@@ -281,13 +262,19 @@ void Application::PreRender(float dt) {
     vk::ImageSubresourceRange clearRange = CreateSubresourceRangeForAllLayers(vk::ImageAspectFlagBits::eColor);
 
     // clear image
-    cmd.clearColorImage(swapchainImages[currentSwapchainImageIndex], vk::ImageLayout::eGeneral, clearValue, clearRange);
+    cmd.clearColorImage(drawImage, vk::ImageLayout::eGeneral, clearValue, clearRange);
 }
-void Application::Render(float dt) {}
+
 void Application::PostRender(float dt) {
     vk::CommandBuffer cmd = GetCurrentFrame().mainCommandBuffer;
 
-    TransitionImage(cmd, swapchainImages[currentSwapchainImageIndex], vk::ImageLayout::eGeneral, vk::ImageLayout::ePresentSrcKHR);
+    VulkanImage::Transition(cmd, drawImage, vk::ImageLayout::eGeneral, vk::ImageLayout::eTransferSrcOptimal);
+    VulkanImage::Transition(cmd, swapchainImages[currentSwapchainImageIndex], vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal);
+
+    VulkanImage::Blit(cmd, drawImage, swapchainImages[currentSwapchainImageIndex], drawExtent, swapchainExtent);
+
+    VulkanImage::Transition(cmd, swapchainImages[currentSwapchainImageIndex], vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::ePresentSrcKHR);
+
     cmd.end();
 
     vk::CommandBufferSubmitInfo submitInfo = {cmd};

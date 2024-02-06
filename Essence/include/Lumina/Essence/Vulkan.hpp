@@ -2,3 +2,9 @@
 #include <vulkan/vulkan.hpp>
 
 #include <vk_mem_alloc.h>
+
+namespace Lumina::Essence {
+
+vk::ImageSubresourceRange CreateSubresourceRangeForAllLayers(vk::ImageAspectFlags aspect);
+
+}

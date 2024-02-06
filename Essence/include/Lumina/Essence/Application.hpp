@@ -2,6 +2,7 @@
 
 #include "Lumina/Essence/Utils/NonCopyable.hpp"
 #include "Lumina/Essence/Vulkan.hpp"
+#include "Lumina/Essence/VulkanImage.hpp"
 #include "Lumina/Essence/Window.hpp"
 #include "Lumina/Essence/DeletionQueue.hpp"
 
@@ -65,6 +66,8 @@ protected:
 
     VmaAllocator allocator;
 
+    VulkanImage drawImage;
+    vk::Extent2D drawExtent;
 
     const std::string windowTitle;
     const glm::ivec2 windowSize;
@@ -81,9 +84,6 @@ private:
         return frames.at(currentFrame % frames.size());
     }
 
-    static void TransitionImage(vk::CommandBuffer cmd, vk::Image img, vk::ImageLayout srcLayout, vk::ImageLayout dstLayout);
-    static vk::ImageSubresourceRange CreateSubresourceRangeForAllLayers(vk::ImageAspectFlags aspect);
-
     bool IsRunning = false;
     bool IsInitialized = false;
     bool IsRenderingEnabled = true;
@@ -93,6 +93,8 @@ private:
 
     vk::Queue graphicsQueue;
     uint32_t graphicsQueueFamily;
+
+    friend class VulkanImage;
 };
 
 }
