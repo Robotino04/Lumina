@@ -13,8 +13,8 @@ BraceWrapping:
   AfterFunction: false
   BeforeCatch: true
   BeforeElse: true
+  IndentBraces: false
 BreakBeforeBraces: Custom
-IndentBraces: false
 BreakConstructorInitializers: BeforeColon
 Cpp11BracedListStyle: true
 IndentCaseLabels: true
@@ -51,3 +51,4 @@ AlignOperands: AlignAfterOperator
 BreakBeforeBinaryOperators: NonAssignment
 PenaltyBreakAssignment: 100
 PenaltyExcessCharacter: 1
+FixNamespaceComments: false
