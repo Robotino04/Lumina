@@ -43,7 +43,7 @@ void Application::InitVulkan() {
                                     .set_engine_name("Lumina")
                                     .set_engine_version(1, 0, 0)
                                     .request_validation_layers(BuildMode::Current == BuildMode::Debug)
-                                    .use_default_debug_messenger()
+                                    .set_debug_callback(VulkanDebugCallback)
                                     .require_api_version(1, 3, 0)
                                     .build()
                                     .value();
@@ -200,6 +200,51 @@ void Application::CreateSwapchain(glm::ivec2 size) {
         mainDeletionQueue.PushBack([=, this]() { device.destroyImageView(imgView); }, std::format("image view F{}", i));
         i++;
     }
+}
+
+VKAPI_ATTR VkBool32 VKAPI_CALL Application::VulkanDebugCallback(
+    VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+    VkDebugUtilsMessageTypeFlagsEXT messageType,
+    const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
+    void* userData
+) {
+    std::string severity;
+    switch (static_cast<vk::DebugUtilsMessageSeverityFlagBitsEXT>(messageSeverity)) {
+        using enum vk::DebugUtilsMessageSeverityFlagBitsEXT;
+        case eVerbose: severity = "Verbose"; break;
+        case eError:   severity = "Error"; break;
+        case eWarning: severity = "Warning"; break;
+        case eInfo:    severity = "Info"; break;
+        default:       severity = "Unknown"; break;
+    };
+
+    std::string type;
+    const auto castMessageType = static_cast<vk::DebugUtilsMessageTypeFlagBitsEXT>(messageType);
+
+    using enum vk::DebugUtilsMessageTypeFlagBitsEXT;
+    if (castMessageType & eDeviceAddressBinding) {
+        type += "DeviceAddressBinding";
+    }
+    if (castMessageType & eGeneral) {
+        if (!type.empty()) type += " | ";
+        type += "General";
+    }
+    if (castMessageType & eValidation) {
+        if (!type.empty()) type += " | ";
+        type += "Validation";
+    }
+    if (castMessageType & ePerformance) {
+        if (!type.empty()) type += " | ";
+        type += "Performance";
+    }
+
+    if (type.empty()) {
+        type = "Unknown";
+    }
+
+    std::cout << std::format("[{}: {}] {}\n", severity, type, pCallbackData->pMessage);
+
+    return vk::False; // Applications must return false here
 }
 
 void Application::Run() {

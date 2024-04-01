@@ -84,6 +84,14 @@ private:
         return frames.at(currentFrame % frames.size());
     }
 
+    // Feel free to copy-paste it into your own code, change it as needed, then call `set_debug_callback()` to use that instead
+    static inline VKAPI_ATTR VkBool32 VKAPI_CALL VulkanDebugCallback(
+        VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+        VkDebugUtilsMessageTypeFlagsEXT messageType,
+        const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
+        void* userData
+    );
+
     bool IsRunning = false;
     bool IsInitialized = false;
     bool IsRenderingEnabled = true;
