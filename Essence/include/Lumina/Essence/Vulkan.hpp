@@ -6,5 +6,6 @@
 namespace Lumina::Essence {
 
 vk::ImageSubresourceRange CreateSubresourceRangeForAllLayers(vk::ImageAspectFlags aspect);
+vk::ShaderModule LoadShaderModule(std::string const& filename, vk::Device device);
 
 }

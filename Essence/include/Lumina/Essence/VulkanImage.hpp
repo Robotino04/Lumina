@@ -21,6 +21,13 @@ public:
     inline operator vk::Image() {
         return image;
     }
+    inline operator vk::ImageView() const {
+        return imageView;
+    }
+
+    inline vk::Extent3D getExtent() const {
+        return imageExtent;
+    }
 
     void Destroy();
 

@@ -17,6 +17,7 @@ public:
         bindings.push_back(newBinding);
     }
 
+    [[nodiscard]]
     vk::DescriptorSetLayout build(vk::Device device, vk::ShaderStageFlags shaderStages) {
         for (auto& b : bindings) {
             b.stageFlags |= shaderStages;

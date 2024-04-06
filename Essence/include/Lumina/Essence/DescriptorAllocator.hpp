@@ -11,8 +11,9 @@ public:
         float ratio;
     };
 
-    DescriptorAllocator(vk::Device device, uint32_t maxSets, std::span<PoolSizeRatio> poolRatios)
-        : device(device) {
+    void Initialize(vk::Device device, uint32_t maxSets, std::span<PoolSizeRatio> poolRatios) {
+        this->device = device;
+
         std::vector<vk::DescriptorPoolSize> poolSizes;
         for (auto ratio : poolRatios) {
             poolSizes.push_back(vk::DescriptorPoolSize{
@@ -29,12 +30,25 @@ public:
 
         pool = device.createDescriptorPool(poolInfo);
     }
-    ~DescriptorAllocator(){
-        device.destroyDescriptorPool(pool);
+    void Destroy() {
+        if (device) {
+            device.destroyDescriptorPool(pool);
+            device = nullptr;
+        }
     }
 
-    void reset() {
+    void Reset() {
         device.resetDescriptorPool(pool, {});
+    }
+
+    vk::DescriptorSet Allocate(vk::DescriptorSetLayout layout) {
+        vk::DescriptorSetAllocateInfo info = {
+            pool,
+            1,
+            &layout,
+        };
+
+        return device.allocateDescriptorSets(info)[0];
     }
 
 private:

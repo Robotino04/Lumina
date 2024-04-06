@@ -1,6 +1,6 @@
 #include "Lumina/Essence/Application.hpp"
+#include "Lumina/Essence/DescriptorLayoutBuilder.hpp"
 #include "Lumina/Essence/Platform.hpp"
-#include "Lumina/Essence/Utils/FileIO.hpp"
 
 #include <VkBootstrap.h>
 #include <glm/glm.hpp>
@@ -12,7 +12,7 @@
 namespace Lumina::Essence {
 
 Application::Application(glm::ivec2 windowSize, std::string const& windowTitle)
-    : Name(windowTitle), window(windowSize, windowTitle), windowTitle(windowTitle), windowSize(windowSize) {}
+    : name(windowTitle), window(windowSize, windowTitle), windowTitle(windowTitle), windowSize(windowSize) {}
 Application::~Application() {
     std::cout << "Application shutting down...\n";
 
@@ -28,8 +28,10 @@ void Application::Initialize() {
     InitSwapchain();
     InitCommands();
     InitSyncObjects();
+    InitDescriptors();
+    InitPipelines();
 
-    IsInitialized = true;
+    isInitialized = true;
 }
 
 
@@ -133,13 +135,11 @@ void Application::InitCommands() {
 
         mainDeletionQueue.PushBack([=, this]() { device.destroyCommandPool(frame.commandPool); }, std::format("command pool F{}", i));
 
-        frame.mainCommandBuffer = device
-                                      .allocateCommandBuffers({
-                                          frame.commandPool,                // command pool
-                                          vk::CommandBufferLevel::ePrimary, // command buffer level
-                                          1,                                // num buffers
-                                      })
-                                      .at(0);
+        frame.mainCommandBuffer = device.allocateCommandBuffers({
+            frame.commandPool,                // command pool
+            vk::CommandBufferLevel::ePrimary, // command buffer level
+            1,                                // num buffers
+        })[0];
         i++;
     }
 
@@ -170,6 +170,92 @@ void Application::InitSyncObjects() {
 
     std::cout << "Sync objects initialized\n";
 }
+void Application::InitDescriptors() {
+    std::cout << "Initializing descriptors\n";
+
+    std::vector<DescriptorAllocator::PoolSizeRatio> sizes = {
+        {vk::DescriptorType::eStorageImage, 1},
+    };
+
+    globalDescriptorAllocator.Initialize(device, 10, sizes);
+    mainDeletionQueue.PushBack([this]() { globalDescriptorAllocator.Destroy(); }, "global descriptor allocator");
+
+    {
+        DescriptorLayoutBuilder builder;
+        builder.AddBinding(0, vk::DescriptorType::eStorageImage);
+        drawImageDescriptorLayout = builder.build(device, vk::ShaderStageFlagBits::eCompute);
+    }
+
+    drawImageDescriptors = globalDescriptorAllocator.Allocate(drawImageDescriptorLayout);
+
+    vk::DescriptorImageInfo imgInfo = {
+        {},
+        drawImage,
+        vk::ImageLayout::eGeneral,
+    };
+
+    vk::WriteDescriptorSet drawImageWrite = {
+        drawImageDescriptors,
+        0,
+        0,
+        1,
+        vk::DescriptorType::eStorageImage,
+        &imgInfo,
+    };
+
+    device.updateDescriptorSets(drawImageWrite, {});
+
+    std::cout << "Descriptors initialized\n";
+}
+
+
+void Application::InitPipelines() {
+    std::cout << "Initializing pipelines\n";
+
+    InitBackgroundPipelines();
+
+    std::cout << "Pipelines initialized\n";
+}
+
+
+void Application::InitBackgroundPipelines() {
+    std::cout << "Initializing background pipelines\n";
+
+    vk::PipelineLayoutCreateInfo computeLayout = {{}, drawImageDescriptorLayout};
+
+    gradientPipelineLayout = device.createPipelineLayout(computeLayout);
+
+    vk::ShaderModule computeDrawShader = LoadShaderModule("resources/shaders/gradient.comp.spv", device);
+
+    vk::PipelineShaderStageCreateInfo stageInfo = {
+        {},
+        vk::ShaderStageFlagBits::eCompute,
+        computeDrawShader,
+        "main",
+    };
+
+    vk::ComputePipelineCreateInfo computePipelineCreateInfo = {
+        {},
+        stageInfo,
+        gradientPipelineLayout,
+    };
+
+    auto gradientPipelineResult = device.createComputePipeline(nullptr, computePipelineCreateInfo);
+    if (gradientPipelineResult.result != vk::Result::eSuccess) {
+        std::cout << "Error creating compute pipeline: " << gradientPipelineResult.result << "\n";
+    }
+    gradientPipeline = gradientPipelineResult.value;
+
+    device.destroyShaderModule(computeDrawShader);
+
+    mainDeletionQueue.PushBack(
+        [&]() { device.destroyPipelineLayout(gradientPipelineLayout); },
+        "gradient pipeline layout"
+    );
+    mainDeletionQueue.PushBack([&]() { device.destroyPipeline(gradientPipeline); }, "gradient pipeline");
+
+    std::cout << "Background pipelines initialized\n";
+}
 
 void Application::CreateSwapchain(glm::ivec2 size) {
 
@@ -183,6 +269,7 @@ void Application::CreateSwapchain(glm::ivec2 size) {
                                       })
                                       .set_desired_extent(size.x, size.y)
                                       .add_image_usage_flags(static_cast<VkImageUsageFlags>(vk::ImageUsageFlagBits::eTransferDst))
+                                      .set_desired_present_mode(static_cast<VkPresentModeKHR>(vk::PresentModeKHR::eFifo))
                                       .build()
                                       .value();
     swapchainExtent = vkbSwapchain.extent;
@@ -248,24 +335,24 @@ VKAPI_ATTR VkBool32 VKAPI_CALL Application::VulkanDebugCallback(
 }
 
 void Application::Run() {
-    if (!IsInitialized)
+    if (!isInitialized)
         throw std::logic_error(
             "Tried running application without initializing it first. Maybe call the parents Initialize() "
             "functions in derived classes."
         );
 
-    IsRunning = true;
+    isRunning = true;
     float dt = 1.0f / 60.0f;
-    while (IsRunning) {
+    while (isRunning) {
         while (auto e = window.GetEvent()) {
             HandleEvent(e.value());
         }
 
         Tick(dt);
 
-        if (!IsRenderingEnabled) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            continue;
+        if (!isRenderingEnabled) {
+            // std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            // continue;
         }
 
 
@@ -275,20 +362,26 @@ void Application::Run() {
     }
 }
 void Application::Exit() {
-    IsRunning = false;
+    isRunning = false;
 }
 
 
 void Application::Tick(float dt) {}
 
 void Application::PreRender(float dt) {
-    device.waitForFences(GetCurrentFrame().renderFence, true, UINT64_MAX);
+    (void)device.waitForFences(GetCurrentFrame().renderFence, true, UINT64_MAX);
     GetCurrentFrame().deletionQueue.Flush();
 
     device.resetFences(GetCurrentFrame().renderFence);
 
     currentSwapchainImageIndex =
         device.acquireNextImageKHR(swapchain, UINT64_MAX, GetCurrentFrame().swapchainSemaphore, nullptr).value;
+
+    auto drawImageExtent = drawImage.getExtent();
+    drawExtent = vk::Extent2D{
+        drawImageExtent.width,
+        drawImageExtent.height,
+    };
 
     vk::CommandBuffer cmd = GetCurrentFrame().mainCommandBuffer;
     cmd.reset();
@@ -300,14 +393,9 @@ void Application::PreRender(float dt) {
 void Application::Render(float dt) {
     vk::CommandBuffer cmd = GetCurrentFrame().mainCommandBuffer;
 
-    // make a clear-color from frame number. This will flash with a 120 frame period.
-    float flash = glm::abs(glm::sin(float(currentFrame) / 120.0f));
-    vk::ClearColorValue clearValue(0.0f, 0.0f, flash, 1.0f);
-
-    vk::ImageSubresourceRange clearRange = CreateSubresourceRangeForAllLayers(vk::ImageAspectFlagBits::eColor);
-
-    // clear image
-    cmd.clearColorImage(drawImage, vk::ImageLayout::eGeneral, clearValue, clearRange);
+    cmd.bindPipeline(vk::PipelineBindPoint::eCompute, gradientPipeline);
+    cmd.bindDescriptorSets(vk::PipelineBindPoint::eCompute, gradientPipelineLayout, 0, drawImageDescriptors, {});
+    cmd.dispatch(std::ceil(drawExtent.width / 16.0), std::ceil(drawExtent.height / 16.0), 1);
 }
 
 void Application::PostRender(float dt) {
@@ -337,14 +425,14 @@ void Application::PostRender(float dt) {
         currentSwapchainImageIndex,
     };
 
-    graphicsQueue.presentKHR(presentInfo);
+    (void)graphicsQueue.presentKHR(presentInfo);
     currentFrame++;
 }
 void Application::HandleEvent(SDL_Event e) {
     switch (e.type) {
         case SDL_EventType::SDL_EVENT_QUIT:             Exit(); break;
-        case SDL_EventType::SDL_EVENT_WINDOW_MINIMIZED: IsRenderingEnabled = false; break;
-        case SDL_EventType::SDL_EVENT_WINDOW_MAXIMIZED: IsRenderingEnabled = true; break;
+        case SDL_EventType::SDL_EVENT_WINDOW_MINIMIZED: isRenderingEnabled = false; break;
+        case SDL_EventType::SDL_EVENT_WINDOW_MAXIMIZED: isRenderingEnabled = true; break;
     }
 }
 

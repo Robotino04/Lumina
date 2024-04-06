@@ -4,7 +4,7 @@ namespace Lumina::Essence {
 
 #ifndef NDEBUG
     #define LUMINA_DEBUG
-#elif
+#else
     #define LUMINA_RELEASE
 #endif
 
@@ -17,7 +17,7 @@ enum BuildMode {
 #elif defined(LUMINA_RELEASE)
     Current = Release,
 #else
-    #error Lumina is trying to compile in both release and debug mode which is impossible
+    #error Lumina is trying to compile in neither release nor debug mode which is impossible
 #endif
 };
 

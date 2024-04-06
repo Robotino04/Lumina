@@ -112,9 +112,9 @@ void VulkanImage::Blit(vk::CommandBuffer cmd, vk::Image source, vk::Image destin
         {
             vk::Offset3D{},
             vk::Offset3D{
-                sourceSize.width,  // x
-                sourceSize.height, // y
-                1,                 // z
+                static_cast<int32_t>(sourceSize.width),
+                static_cast<int32_t>(sourceSize.height),
+                1,
             },
         }, // source offsets
 
@@ -128,9 +128,9 @@ void VulkanImage::Blit(vk::CommandBuffer cmd, vk::Image source, vk::Image destin
             
             vk::Offset3D{},
             vk::Offset3D{
-                destinationSize.width,  // x
-                destinationSize.height, // y
-                1,                      // z
+                static_cast<int32_t>(destinationSize.width),
+                static_cast<int32_t>(destinationSize.height),
+                1,
             },
         }, // destination offsets
     };

@@ -5,6 +5,7 @@
 #include "Lumina/Essence/VulkanImage.hpp"
 #include "Lumina/Essence/Window.hpp"
 #include "Lumina/Essence/DeletionQueue.hpp"
+#include "Lumina/Essence/DescriptorAllocator.hpp"
 
 #include <glm/glm.hpp>
 
@@ -31,7 +32,7 @@ public:
     void Run();
     void Exit();
 
-    const std::string Name;
+    const std::string name;
 
 protected:
     struct FrameData {
@@ -69,15 +70,25 @@ protected:
     VulkanImage drawImage;
     vk::Extent2D drawExtent;
 
+    DescriptorAllocator globalDescriptorAllocator;
+    vk::DescriptorSet drawImageDescriptors;
+    vk::DescriptorSetLayout drawImageDescriptorLayout;
+
+    vk::Pipeline gradientPipeline;
+    vk::PipelineLayout gradientPipelineLayout;
+
     const std::string windowTitle;
-    const glm::ivec2 windowSize;
+    const glm::uvec2 windowSize;
 
 private:
     void InitVulkan();
     void InitSwapchain();
     void InitCommands();
     void InitSyncObjects();
+    void InitDescriptors();
+    void InitPipelines();
 
+    void InitBackgroundPipelines();
     void CreateSwapchain(glm::ivec2 size);
 
     inline FrameData& GetCurrentFrame() {
@@ -92,9 +103,9 @@ private:
         void* userData
     );
 
-    bool IsRunning = false;
-    bool IsInitialized = false;
-    bool IsRenderingEnabled = true;
+    bool isRunning = false;
+    bool isInitialized = false;
+    bool isRenderingEnabled = true;
 
     uint32_t currentFrame = 0;
     uint32_t currentSwapchainImageIndex = 0;
