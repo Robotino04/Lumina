@@ -240,11 +240,7 @@ void Application::InitBackgroundPipelines() {
         gradientPipelineLayout,
     };
 
-    auto gradientPipelineResult = device.createComputePipeline(nullptr, computePipelineCreateInfo);
-    if (gradientPipelineResult.result != vk::Result::eSuccess) {
-        std::cout << "Error creating compute pipeline: " << gradientPipelineResult.result << "\n";
-    }
-    gradientPipeline = gradientPipelineResult.value;
+    gradientPipeline = VkCheck(device.createComputePipeline(nullptr, computePipelineCreateInfo));
 
     device.destroyShaderModule(computeDrawShader);
 
@@ -295,39 +291,8 @@ VKAPI_ATTR VkBool32 VKAPI_CALL Application::VulkanDebugCallback(
     const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
     void* userData
 ) {
-    std::string severity;
-    switch (static_cast<vk::DebugUtilsMessageSeverityFlagBitsEXT>(messageSeverity)) {
-        using enum vk::DebugUtilsMessageSeverityFlagBitsEXT;
-        case eVerbose: severity = "Verbose"; break;
-        case eError:   severity = "Error"; break;
-        case eWarning: severity = "Warning"; break;
-        case eInfo:    severity = "Info"; break;
-        default:       severity = "Unknown"; break;
-    };
-
-    std::string type;
-    const auto castMessageType = static_cast<vk::DebugUtilsMessageTypeFlagBitsEXT>(messageType);
-
-    using enum vk::DebugUtilsMessageTypeFlagBitsEXT;
-    if (castMessageType & eDeviceAddressBinding) {
-        type += "DeviceAddressBinding";
-    }
-    if (castMessageType & eGeneral) {
-        if (!type.empty()) type += " | ";
-        type += "General";
-    }
-    if (castMessageType & eValidation) {
-        if (!type.empty()) type += " | ";
-        type += "Validation";
-    }
-    if (castMessageType & ePerformance) {
-        if (!type.empty()) type += " | ";
-        type += "Performance";
-    }
-
-    if (type.empty()) {
-        type = "Unknown";
-    }
+    std::string severity = vk::to_string(static_cast<vk::DebugUtilsMessageSeverityFlagBitsEXT>(messageSeverity));
+    std::string type = vk::to_string(static_cast<vk::DebugUtilsMessageTypeFlagBitsEXT>(messageType));
 
     std::cout << std::format("[{}: {}] {}\n", severity, type, pCallbackData->pMessage);
 
@@ -351,8 +316,8 @@ void Application::Run() {
         Tick(dt);
 
         if (!isRenderingEnabled) {
-            // std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            // continue;
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            continue;
         }
 
 
@@ -369,7 +334,7 @@ void Application::Exit() {
 void Application::Tick(float dt) {}
 
 void Application::PreRender(float dt) {
-    (void)device.waitForFences(GetCurrentFrame().renderFence, true, UINT64_MAX);
+    VkCheck(device.waitForFences(GetCurrentFrame().renderFence, true, UINT64_MAX));
     GetCurrentFrame().deletionQueue.Flush();
 
     device.resetFences(GetCurrentFrame().renderFence);
@@ -425,7 +390,7 @@ void Application::PostRender(float dt) {
         currentSwapchainImageIndex,
     };
 
-    (void)graphicsQueue.presentKHR(presentInfo);
+    VkCheck(graphicsQueue.presentKHR(presentInfo));
     currentFrame++;
 }
 void Application::HandleEvent(SDL_Event e) {
