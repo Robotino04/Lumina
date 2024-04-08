@@ -11,6 +11,7 @@ Window::Window(glm::ivec2 size, std::string const& title) {
     SDL_Init(SDL_INIT_VIDEO);
 
     window = SDL_CreateWindow(title.c_str(), size.x, size.y, SDL_WINDOW_VULKAN);
+    SDL_StartTextInput();
 }
 
 Window::~Window() {

@@ -18,6 +18,10 @@ public:
 
     std::optional<SDL_Event> GetEvent();
 
+    inline SDL_Window* getRawWindow() {
+        return window;
+    }
+
     vk::SurfaceKHR CreateWindowSurface(vk::Instance instance) const;
 
 private:

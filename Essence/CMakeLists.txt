@@ -10,4 +10,12 @@ target_include_directories(LuminaEssence PUBLIC "include")
 
 target_compile_features(LuminaEssence PUBLIC cxx_std_20)
 
-target_link_libraries(LuminaEssence PUBLIC glm SDL3::SDL3 Vulkan::Vulkan vk-bootstrap::vk-bootstrap GPUOpen::VulkanMemoryAllocator)
+target_link_libraries(
+    LuminaEssence PUBLIC
+    glm
+    SDL3::SDL3
+    Vulkan::Vulkan
+    vk-bootstrap::vk-bootstrap
+    GPUOpen::VulkanMemoryAllocator
+    imgui
+)

@@ -5,6 +5,11 @@
 #include <VkBootstrap.h>
 #include <glm/glm.hpp>
 
+#include <imgui.h>
+#include <backends/imgui_impl_vulkan.h>
+#include <backends/imgui_impl_sdl3.h>
+#include <misc/cpp/imgui_stdlib.h>
+
 #include <iostream>
 #include <chrono>
 #include <thread>
@@ -30,6 +35,7 @@ void Application::Initialize() {
     InitSyncObjects();
     InitDescriptors();
     InitPipelines();
+    InitImgui();
 
     isInitialized = true;
 }
@@ -132,7 +138,6 @@ void Application::InitCommands() {
     int i = 0;
     for (auto& frame : frames) {
         frame.commandPool = device.createCommandPool(commandPoolInfo);
-
         mainDeletionQueue.PushBack([=, this]() { device.destroyCommandPool(frame.commandPool); }, std::format("command pool F{}", i));
 
         frame.mainCommandBuffer = device.allocateCommandBuffers({
@@ -142,6 +147,19 @@ void Application::InitCommands() {
         })[0];
         i++;
     }
+
+
+    immediateCommandPool = device.createCommandPool(commandPoolInfo);
+    mainDeletionQueue.PushBack(
+        [=, this]() { device.destroyCommandPool(immediateCommandPool); },
+        "immediate command pool"
+    );
+    immediateCommandBuffer = device.allocateCommandBuffers({
+        immediateCommandPool,
+        vk::CommandBufferLevel::ePrimary,
+        1,
+    })[0];
+
 
     std::cout << "Commands initialized\n";
 }
@@ -167,6 +185,9 @@ void Application::InitSyncObjects() {
         );
         i++;
     }
+
+    immediateFence = device.createFence(fenceInfo);
+    mainDeletionQueue.PushBack([&]() { device.destroyFence(immediateFence); }, "immediate fence");
 
     std::cout << "Sync objects initialized\n";
 }
@@ -215,6 +236,69 @@ void Application::InitPipelines() {
     InitBackgroundPipelines();
 
     std::cout << "Pipelines initialized\n";
+}
+void Application::InitImgui() {
+    std::array<vk::DescriptorPoolSize, 11> pool_sizes = {
+        {
+         {vk::DescriptorType::eSampler, 1000},
+         {vk::DescriptorType::eCombinedImageSampler, 1000},
+         {vk::DescriptorType::eSampledImage, 1000},
+         {vk::DescriptorType::eStorageImage, 1000},
+         {vk::DescriptorType::eUniformTexelBuffer, 1000},
+         {vk::DescriptorType::eStorageTexelBuffer, 1000},
+         {vk::DescriptorType::eUniformBuffer, 1000},
+         {vk::DescriptorType::eStorageBuffer, 1000},
+         {vk::DescriptorType::eUniformBufferDynamic, 1000},
+         {vk::DescriptorType::eStorageBufferDynamic, 1000},
+         {vk::DescriptorType::eInputAttachment, 1000},
+         }
+    };
+
+    vk::DescriptorPoolCreateInfo poolInfo = {
+        {},
+        1000,
+        pool_sizes,
+    };
+
+    vk::DescriptorPool imguiPool = device.createDescriptorPool(poolInfo);
+    
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+
+    ImGuiIO& io = ImGui::GetIO();
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
+
+    ImGui::StyleColorsDark();
+
+    ImGui_ImplSDL3_InitForVulkan(window.getRawWindow());
+
+    ImGui_ImplVulkan_InitInfo initInfo = {
+        .Instance = instance,
+        .PhysicalDevice = physicalDevice,
+        .Device = device,
+        .QueueFamily = graphicsQueueFamily,
+        .Queue = graphicsQueue,
+        .DescriptorPool = imguiPool,
+        .RenderPass = nullptr,
+        .MinImageCount = 3,
+        .ImageCount = 3,
+        .MSAASamples = VK_SAMPLE_COUNT_1_BIT,
+        .UseDynamicRendering = true,
+        .PipelineRenderingCreateInfo = vk::PipelineRenderingCreateInfoKHR{{}, swapchainImageFormat},
+    };
+
+    ImGui_ImplVulkan_Init(&initInfo);
+
+    mainDeletionQueue.PushBack(
+        [=, this]() {
+            device.destroyDescriptorPool(imguiPool);
+            ImGui_ImplSDL3_Shutdown();
+            ImGui_ImplVulkan_Shutdown();
+            ImGui::DestroyContext();
+        },
+        "imgui state"
+    );
 }
 
 
@@ -265,7 +349,7 @@ void Application::CreateSwapchain(glm::ivec2 size) {
                                       })
                                       .set_desired_extent(size.x, size.y)
                                       .add_image_usage_flags(static_cast<VkImageUsageFlags>(vk::ImageUsageFlagBits::eTransferDst))
-                                      .set_desired_present_mode(static_cast<VkPresentModeKHR>(vk::PresentModeKHR::eFifo))
+                                      .set_desired_present_mode(static_cast<VkPresentModeKHR>(vk::PresentModeKHR::eImmediate))
                                       .build()
                                       .value();
     swapchainExtent = vkbSwapchain.extent;
@@ -283,6 +367,31 @@ void Application::CreateSwapchain(glm::ivec2 size) {
         mainDeletionQueue.PushBack([=, this]() { device.destroyImageView(imgView); }, std::format("image view F{}", i));
         i++;
     }
+}
+
+void Application::SubmitImmediately(std::function<void(vk::CommandBuffer)>&& func) {
+    device.resetFences(immediateFence);
+    immediateCommandBuffer.reset();
+
+    immediateCommandBuffer.begin({{vk::CommandBufferUsageFlagBits::eOneTimeSubmit}});
+
+    func(immediateCommandBuffer);
+
+    immediateCommandBuffer.end();
+
+    vk::CommandBufferSubmitInfo submitInfo = {
+        immediateCommandBuffer,
+    };
+
+    vk::SubmitInfo2 submit = {
+        {},
+        {},
+        submitInfo,
+        {},
+    };
+
+    graphicsQueue.submit2(submit, immediateFence);
+    VkCheck(device.waitForFences(immediateFence, true, UINT64_MAX));
 }
 
 VKAPI_ATTR VkBool32 VKAPI_CALL Application::VulkanDebugCallback(
@@ -353,6 +462,10 @@ void Application::PreRender(float dt) {
     cmd.begin({{vk::CommandBufferUsageFlagBits::eOneTimeSubmit}});
 
     VulkanImage::Transition(cmd, drawImage, vk::ImageLayout::eUndefined, vk::ImageLayout::eGeneral);
+
+    ImGui_ImplSDL3_NewFrame();
+    ImGui_ImplVulkan_NewFrame();
+    ImGui::NewFrame();
 }
 
 void Application::Render(float dt) {
@@ -361,17 +474,33 @@ void Application::Render(float dt) {
     cmd.bindPipeline(vk::PipelineBindPoint::eCompute, gradientPipeline);
     cmd.bindDescriptorSets(vk::PipelineBindPoint::eCompute, gradientPipelineLayout, 0, drawImageDescriptors, {});
     cmd.dispatch(std::ceil(drawExtent.width / 16.0), std::ceil(drawExtent.height / 16.0), 1);
+
+
+    ImGui::ShowDemoWindow();
+    {
+        ImGui::Begin("Test Input");
+
+        static int x = 0;
+        ImGui::InputInt("int: ", &x, 1, 100, ImGuiInputTextFlags_CharsDecimal);
+        ImGui::Text("%B", ImGui::IsKeyDown(ImGuiKey_2));
+        ImGui::End();
+    }
 }
 
 void Application::PostRender(float dt) {
     vk::CommandBuffer cmd = GetCurrentFrame().mainCommandBuffer;
 
+    auto& currentImage = swapchainImages[currentSwapchainImageIndex];
+    auto& currentImageView = swapchainImageViews[currentSwapchainImageIndex];
+
     VulkanImage::Transition(cmd, drawImage, vk::ImageLayout::eGeneral, vk::ImageLayout::eTransferSrcOptimal);
-    VulkanImage::Transition(cmd, swapchainImages[currentSwapchainImageIndex], vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal);
+    VulkanImage::Transition(cmd, currentImage, vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal);
 
-    VulkanImage::Blit(cmd, drawImage, swapchainImages[currentSwapchainImageIndex], drawExtent, swapchainExtent);
+    VulkanImage::Blit(cmd, drawImage, currentImage, drawExtent, swapchainExtent);
 
-    VulkanImage::Transition(cmd, swapchainImages[currentSwapchainImageIndex], vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::ePresentSrcKHR);
+    VulkanImage::Transition(cmd, currentImage, vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eColorAttachmentOptimal);
+    RenderImGui(cmd, currentImageView);
+    VulkanImage::Transition(cmd, currentImage, vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::ePresentSrcKHR);
 
     cmd.end();
 
@@ -393,12 +522,33 @@ void Application::PostRender(float dt) {
     VkCheck(graphicsQueue.presentKHR(presentInfo));
     currentFrame++;
 }
+
+void Application::RenderImGui(vk::CommandBuffer cmd, vk::ImageView targetView) {
+    ImGui::Render();
+
+    vk::RenderingAttachmentInfo colorAttachment = {
+        targetView,
+        vk::ImageLayout::eGeneral,
+        vk::ResolveModeFlagBits::eNone,
+        {},
+        vk::ImageLayout::eUndefined,
+        vk::AttachmentLoadOp::eLoad,
+        vk::AttachmentStoreOp::eStore,
+    };
+    vk::RenderingInfo renderInfo = CreateRenderingInfo(swapchainExtent, colorAttachment, nullptr);
+
+    cmd.beginRendering(renderInfo);
+    ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmd);
+    cmd.endRendering();
+}
+
 void Application::HandleEvent(SDL_Event e) {
+    ImGui_ImplSDL3_ProcessEvent(&e);
+
     switch (e.type) {
         case SDL_EventType::SDL_EVENT_QUIT:             Exit(); break;
         case SDL_EventType::SDL_EVENT_WINDOW_MINIMIZED: isRenderingEnabled = false; break;
         case SDL_EventType::SDL_EVENT_WINDOW_MAXIMIZED: isRenderingEnabled = true; break;
     }
 }
-
 }

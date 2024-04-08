@@ -6,7 +6,7 @@ using namespace Lumina;
 
 class TrialGroundApplication : public Essence::Application {
 public:
-    TrialGroundApplication(): Application({800, 600}, "Trial Ground") {}
+    TrialGroundApplication(): Application({1920, 1080}, "Trial Ground") {}
 
     void Initialize() override {
         Application::Initialize();

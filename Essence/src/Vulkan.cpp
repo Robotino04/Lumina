@@ -18,6 +18,19 @@ vk::ImageSubresourceRange CreateSubresourceRangeForAllLayers(vk::ImageAspectFlag
     };
 }
 
+
+vk::RenderingInfo CreateRenderingInfo(vk::Extent2D renderExtent, vk::RenderingAttachmentInfo& colorAttachment, vk::RenderingAttachmentInfo* depthAttachment) {
+    return {
+        {},
+        {{0, 0}, renderExtent},
+        1,
+        {},
+        colorAttachment,
+        depthAttachment,
+        nullptr,
+    };
+}
+
 vk::ShaderModule LoadShaderModule(std::string const& filename, vk::Device device) {
     std::vector<uint8_t> bytes = readBinaryFile(filename);
     std::vector<uint32_t> buffer(bytes.size() / sizeof(uint32_t));

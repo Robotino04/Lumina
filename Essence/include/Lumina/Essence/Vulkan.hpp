@@ -8,6 +8,7 @@
 namespace Lumina::Essence {
 
 vk::ImageSubresourceRange CreateSubresourceRangeForAllLayers(vk::ImageAspectFlags aspect);
+vk::RenderingInfo CreateRenderingInfo(vk::Extent2D renderExtent, vk::RenderingAttachmentInfo& colorAttachment, vk::RenderingAttachmentInfo* depthAttachment);
 vk::ShaderModule LoadShaderModule(std::string const& filename, vk::Device device);
 
 template <typename T>

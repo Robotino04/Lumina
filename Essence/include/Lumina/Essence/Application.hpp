@@ -45,6 +45,10 @@ protected:
         DeletionQueue deletionQueue;
     };
 
+    vk::Fence immediateFence;
+    vk::CommandBuffer immediateCommandBuffer;
+    vk::CommandPool immediateCommandPool;
+
     std::array<FrameData, 2> frames;
 
     Window window;
@@ -87,13 +91,18 @@ private:
     void InitSyncObjects();
     void InitDescriptors();
     void InitPipelines();
+    void InitImgui();
 
     void InitBackgroundPipelines();
     void CreateSwapchain(glm::ivec2 size);
 
+    void RenderImGui(vk::CommandBuffer cmd, vk::ImageView targetView);
+
     inline FrameData& GetCurrentFrame() {
         return frames.at(currentFrame % frames.size());
     }
+
+    void SubmitImmediately(std::function<void(vk::CommandBuffer)>&& func);
 
     // Feel free to copy-paste it into your own code, change it as needed, then call `set_debug_callback()` to use that instead
     static inline VKAPI_ATTR VkBool32 VKAPI_CALL VulkanDebugCallback(
