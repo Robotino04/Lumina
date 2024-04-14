@@ -1,9 +1,15 @@
+#define GLM_FORCE_SWIZZLE
+#define GLM_ENABLE_EXPERIMENTAL
+
 #include "Lumina/Essence/Application.hpp"
 #include "Lumina/Essence/DescriptorLayoutBuilder.hpp"
-#include "Lumina/Essence/Platform.hpp"
+#include "Lumina/Essence/Utils/Packed.hpp"
 
 #include <VkBootstrap.h>
+
 #include <glm/glm.hpp>
+#include <glm/gtc/type_ptr.hpp>
+#include <glm/gtx/color_space.hpp>
 
 #include <imgui.h>
 #include <backends/imgui_impl_vulkan.h>
@@ -261,7 +267,7 @@ void Application::InitImgui() {
     };
 
     vk::DescriptorPool imguiPool = device.createDescriptorPool(poolInfo);
-    
+
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
 
@@ -305,7 +311,18 @@ void Application::InitImgui() {
 void Application::InitBackgroundPipelines() {
     std::cout << "Initializing background pipelines\n";
 
-    vk::PipelineLayoutCreateInfo computeLayout = {{}, drawImageDescriptorLayout};
+
+    vk::PushConstantRange pushConstants = {
+        vk::ShaderStageFlagBits::eCompute,
+        0,
+        sizeof(ComputePushConstants),
+    };
+
+    vk::PipelineLayoutCreateInfo computeLayout = {
+        {},
+        drawImageDescriptorLayout,
+        pushConstants,
+    };
 
     gradientPipelineLayout = device.createPipelineLayout(computeLayout);
 
@@ -349,7 +366,7 @@ void Application::CreateSwapchain(glm::ivec2 size) {
                                       })
                                       .set_desired_extent(size.x, size.y)
                                       .add_image_usage_flags(static_cast<VkImageUsageFlags>(vk::ImageUsageFlagBits::eTransferDst))
-                                      .set_desired_present_mode(static_cast<VkPresentModeKHR>(vk::PresentModeKHR::eImmediate))
+                                      .set_desired_present_mode(static_cast<VkPresentModeKHR>(vk::PresentModeKHR::eFifo))
                                       .build()
                                       .value();
     swapchainExtent = vkbSwapchain.extent;
@@ -416,7 +433,9 @@ void Application::Run() {
         );
 
     isRunning = true;
-    float dt = 1.0f / 60.0f;
+    double dt = 1.0f / 60.0f;
+
+    auto lastFrame = std::chrono::high_resolution_clock::now();
     while (isRunning) {
         while (auto e = window.GetEvent()) {
             HandleEvent(e.value());
@@ -433,6 +452,11 @@ void Application::Run() {
         PreRender(dt);
         Render(dt);
         PostRender(dt);
+
+        auto thisFrame = std::chrono::high_resolution_clock::now();
+        dt = static_cast<std::chrono::duration<double>>(thisFrame - lastFrame).count();
+        lastFrame = thisFrame;
+        time += dt;
     }
 }
 void Application::Exit() {
@@ -473,18 +497,21 @@ void Application::Render(float dt) {
 
     cmd.bindPipeline(vk::PipelineBindPoint::eCompute, gradientPipeline);
     cmd.bindDescriptorSets(vk::PipelineBindPoint::eCompute, gradientPipelineLayout, 0, drawImageDescriptors, {});
+
+    static ComputePushConstants pc;
+    pc.color1 = glm::vec4(glm::rgbColor(glm::hsvColor(pc.color1.xyz()) + glm::vec3(dt * 10, 0, 0)), 1.0);
+
+    const float minAxis = glm::min(windowSize.x, windowSize.y);
+    pc.samplePoint = glm::vec2(windowSize) / 2.0f + glm::vec2(minAxis, minAxis) / 4.0f * glm::vec2(cos(time), sin(time));
+
+    ImGui::Begin("Shader Settings");
+    ImGui::Text("Time: %f", time);
+    ImGui::Text("dT: %f", dt);
+    ImGui::ColorEdit3("Color 1", glm::value_ptr(pc.color1));
+    ImGui::End();
+
+    cmd.pushConstants(gradientPipelineLayout, vk::ShaderStageFlagBits::eCompute, 0, sizeof(pc), &pc);
     cmd.dispatch(std::ceil(drawExtent.width / 16.0), std::ceil(drawExtent.height / 16.0), 1);
-
-
-    ImGui::ShowDemoWindow();
-    {
-        ImGui::Begin("Test Input");
-
-        static int x = 0;
-        ImGui::InputInt("int: ", &x, 1, 100, ImGuiInputTextFlags_CharsDecimal);
-        ImGui::Text("%B", ImGui::IsKeyDown(ImGuiKey_2));
-        ImGui::End();
-    }
 }
 
 void Application::PostRender(float dt) {
@@ -548,7 +575,7 @@ void Application::HandleEvent(SDL_Event e) {
     switch (e.type) {
         case SDL_EventType::SDL_EVENT_QUIT:             Exit(); break;
         case SDL_EventType::SDL_EVENT_WINDOW_MINIMIZED: isRenderingEnabled = false; break;
-        case SDL_EventType::SDL_EVENT_WINDOW_MAXIMIZED: isRenderingEnabled = true; break;
+        case SDL_EventType::SDL_EVENT_WINDOW_RESTORED:  isRenderingEnabled = true; break;
     }
 }
 }

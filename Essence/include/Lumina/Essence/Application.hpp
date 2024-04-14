@@ -6,6 +6,7 @@
 #include "Lumina/Essence/Window.hpp"
 #include "Lumina/Essence/DeletionQueue.hpp"
 #include "Lumina/Essence/DescriptorAllocator.hpp"
+#include "Lumina/Essence/Utils/Packed.hpp"
 
 #include <glm/glm.hpp>
 
@@ -14,6 +15,11 @@
 #include <array>
 
 namespace Lumina::Essence {
+
+LUMINA_PACKED(struct ComputePushConstants {
+    glm::vec4 color1 = {1, 0, 0, 1};
+    glm::vec2 samplePoint = {};
+});
 
 class Application : NonCopyable {
 public:
@@ -83,6 +89,8 @@ protected:
 
     const std::string windowTitle;
     const glm::uvec2 windowSize;
+
+    float time = 0;
 
 private:
     void InitVulkan();
