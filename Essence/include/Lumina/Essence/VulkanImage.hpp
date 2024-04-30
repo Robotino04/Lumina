@@ -25,8 +25,12 @@ public:
         return imageView;
     }
 
-    inline vk::Extent3D getExtent() const {
+    inline vk::Extent3D GetExtent() const {
         return imageExtent;
+    }
+
+    inline vk::Format GetFormat() const {
+        return imageFormat;
     }
 
     void Destroy();

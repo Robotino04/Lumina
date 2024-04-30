@@ -87,6 +87,9 @@ protected:
     vk::Pipeline gradientPipeline;
     vk::PipelineLayout gradientPipelineLayout;
 
+    vk::Pipeline trianglePipeline;
+    vk::PipelineLayout trianglePipelineLayout;
+
     const std::string windowTitle;
     const glm::uvec2 windowSize;
 
@@ -102,6 +105,7 @@ private:
     void InitImgui();
 
     void InitBackgroundPipelines();
+    void InitTrianglePipeline();
     void CreateSwapchain(glm::ivec2 size);
 
     void RenderImGui(vk::CommandBuffer cmd, vk::ImageView targetView);

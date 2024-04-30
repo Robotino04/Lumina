@@ -2,6 +2,7 @@
 #define GLM_ENABLE_EXPERIMENTAL
 
 #include "Lumina/Essence/Application.hpp"
+#include "Lumina/Essence/PipelineBuilder.hpp"
 #include "Lumina/Essence/DescriptorLayoutBuilder.hpp"
 #include "Lumina/Essence/Utils/Packed.hpp"
 
@@ -353,6 +354,41 @@ void Application::InitBackgroundPipelines() {
 
     std::cout << "Background pipelines initialized\n";
 }
+void Application::InitTrianglePipeline() {
+    vk::ShaderModule triangleFragmentShader = LoadShaderModule("resources/shaders/colored_triangle.frag.spv", device);
+    vk::ShaderModule triangleVertexShader = LoadShaderModule("resources/shaders/colored_triangle.vert.spv", device);
+
+    vk::PipelineLayoutCreateInfo triangleLayout = {
+        {},
+        drawImageDescriptorLayout,
+    };
+    trianglePipelineLayout = device.createPipelineLayout(triangleLayout);
+
+    PipelineBuilder builder;
+    builder.SetPipelineLayout(trianglePipelineLayout);
+    builder.SetShaders(triangleVertexShader, triangleFragmentShader);
+    builder.SetInputTopology(vk::PrimitiveTopology::eTriangleList);
+    builder.SetPolygonMode(vk::PolygonMode::eFill);
+    builder.SetCullMode(vk::CullModeFlagBits::eNone, vk::FrontFace::eClockwise);
+    builder.SetMultisamplingNone();
+    builder.DisableBlending();
+    builder.DisableDepthTest();
+    builder.SetColorAttachmentFormat(drawImage.GetFormat());
+    builder.SetDepthFormat(vk::Format::eUndefined);
+
+    trianglePipeline = builder.Build(device);
+
+    device.destroyShaderModule(triangleFragmentShader);
+    device.destroyShaderModule(triangleVertexShader);
+
+    mainDeletionQueue.PushBack(
+        [&]() {
+            device.destroyPipelineLayout(trianglePipelineLayout);
+            device.destroyPipeline(trianglePipeline);
+        },
+        "triangle pipeline"
+    );
+}
 
 void Application::CreateSwapchain(glm::ivec2 size) {
 
@@ -475,7 +511,7 @@ void Application::PreRender(float dt) {
     currentSwapchainImageIndex =
         device.acquireNextImageKHR(swapchain, UINT64_MAX, GetCurrentFrame().swapchainSemaphore, nullptr).value;
 
-    auto drawImageExtent = drawImage.getExtent();
+    auto drawImageExtent = drawImage.GetExtent();
     drawExtent = vk::Extent2D{
         drawImageExtent.width,
         drawImageExtent.height,
