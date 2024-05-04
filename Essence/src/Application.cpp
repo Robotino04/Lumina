@@ -241,6 +241,7 @@ void Application::InitPipelines() {
     std::cout << "Initializing pipelines\n";
 
     InitBackgroundPipelines();
+    InitTrianglePipeline();
 
     std::cout << "Pipelines initialized\n";
 }
@@ -312,7 +313,6 @@ void Application::InitImgui() {
 void Application::InitBackgroundPipelines() {
     std::cout << "Initializing background pipelines\n";
 
-
     vk::PushConstantRange pushConstants = {
         vk::ShaderStageFlagBits::eCompute,
         0,
@@ -355,6 +355,7 @@ void Application::InitBackgroundPipelines() {
     std::cout << "Background pipelines initialized\n";
 }
 void Application::InitTrianglePipeline() {
+    std::cout << "Initializing triangle pipeline\n";
     vk::ShaderModule triangleFragmentShader = LoadShaderModule("resources/shaders/colored_triangle.frag.spv", device);
     vk::ShaderModule triangleVertexShader = LoadShaderModule("resources/shaders/colored_triangle.vert.spv", device);
 
@@ -388,6 +389,7 @@ void Application::InitTrianglePipeline() {
         },
         "triangle pipeline"
     );
+    std::cout << "Triangle pipeline initialized\n";
 }
 
 void Application::CreateSwapchain(glm::ivec2 size) {
@@ -548,6 +550,45 @@ void Application::Render(float dt) {
 
     cmd.pushConstants(gradientPipelineLayout, vk::ShaderStageFlagBits::eCompute, 0, sizeof(pc), &pc);
     cmd.dispatch(std::ceil(drawExtent.width / 16.0), std::ceil(drawExtent.height / 16.0), 1);
+
+
+    VulkanImage::Transition(cmd, drawImage, vk::ImageLayout::eGeneral, vk::ImageLayout::eColorAttachmentOptimal);
+
+    vk::RenderingAttachmentInfo colorAttachment = {
+        drawImage,
+        vk::ImageLayout::eGeneral,
+        vk::ResolveModeFlagBits::eNone,
+        {},
+        vk::ImageLayout::eGeneral,
+        vk::AttachmentLoadOp::eLoad,
+        vk::AttachmentStoreOp::eStore,
+    };
+
+    vk::RenderingInfo renderInfo = CreateRenderingInfo(drawExtent, colorAttachment, nullptr);
+    cmd.beginRendering(renderInfo);
+
+    cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, trianglePipeline);
+
+    vk::Viewport viewport = {
+        0,
+        0,
+        static_cast<float>(drawExtent.width),
+        static_cast<float>(drawExtent.height),
+        0.0f,
+        1.0f,
+    };
+
+    cmd.setViewport(0, viewport);
+
+    vk::Rect2D scissor = {
+        {0, 0},
+        drawExtent,
+    };
+
+    cmd.setScissor(0, scissor);
+
+    cmd.draw(3, 1, 0, 0);
+    cmd.endRendering();
 }
 
 void Application::PostRender(float dt) {
@@ -556,7 +597,7 @@ void Application::PostRender(float dt) {
     auto& currentImage = swapchainImages[currentSwapchainImageIndex];
     auto& currentImageView = swapchainImageViews[currentSwapchainImageIndex];
 
-    VulkanImage::Transition(cmd, drawImage, vk::ImageLayout::eGeneral, vk::ImageLayout::eTransferSrcOptimal);
+    VulkanImage::Transition(cmd, drawImage, vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::eTransferSrcOptimal);
     VulkanImage::Transition(cmd, currentImage, vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal);
 
     VulkanImage::Blit(cmd, drawImage, currentImage, drawExtent, swapchainExtent);

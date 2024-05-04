@@ -54,8 +54,6 @@ void PipelineBuilder::SetColorAttachmentFormat(vk::Format format) {
 void PipelineBuilder::SetDepthFormat(vk::Format format) {
     renderInfo.depthAttachmentFormat = format;
 }
-
-}
 void PipelineBuilder::DisableDepthTest() {
     depthStencil.depthTestEnable = vk::False;
     depthStencil.depthWriteEnable = vk::False;
