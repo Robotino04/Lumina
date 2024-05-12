@@ -16,10 +16,7 @@ public:
 
         std::vector<vk::DescriptorPoolSize> poolSizes;
         for (auto ratio : poolRatios) {
-            poolSizes.push_back(vk::DescriptorPoolSize{
-                ratio.type,
-                uint32_t(ratio.ratio * maxSets),
-            });
+            poolSizes.emplace_back(ratio.type, uint32_t(ratio.ratio * maxSets));
         }
 
         vk::DescriptorPoolCreateInfo poolInfo = {

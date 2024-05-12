@@ -3,8 +3,6 @@
 #include "Lumina/Essence/Vulkan.hpp"
 #include "Lumina/Essence/Utils/NonCopyable.hpp"
 
-#include <memory>
-
 namespace Lumina::Essence {
 
 class Application;
@@ -13,8 +11,8 @@ class VulkanImage : NonCopyable {
 public:
     VulkanImage(Application& app, vk::Format format, vk::ImageUsageFlags usageFlags, vk::Extent3D extent, vk::ImageAspectFlags aspectFlags);
     VulkanImage();
-    VulkanImage(VulkanImage&& other);            // allow moving
-    VulkanImage& operator=(VulkanImage&& other); // allow moving
+    VulkanImage(VulkanImage&& other) noexcept;            // allow moving
+    VulkanImage& operator=(VulkanImage&& other) noexcept; // allow moving
 
     ~VulkanImage();
 

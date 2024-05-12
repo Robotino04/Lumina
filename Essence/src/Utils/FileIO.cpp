@@ -5,7 +5,7 @@
 
 namespace Lumina::Essence {
 
-std::vector<uint8_t> readBinaryFile(std::string const& path) {
+std::vector<uint8_t> ReadBinaryFile(std::string const& path) {
     std::ifstream file(path, std::ios::ate | std::ios::binary);
 
     if (!file.is_open()) {
@@ -15,7 +15,7 @@ std::vector<uint8_t> readBinaryFile(std::string const& path) {
     size_t fileSize = file.tellg();
     std::vector<uint8_t> bytes(fileSize);
     file.seekg(0);
-    file.read(reinterpret_cast<char*>(bytes.data()), bytes.size());
+    file.read(reinterpret_cast<char*>(bytes.data()), bytes.size()); // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast) there is no other way
     file.close();
 
     return bytes;

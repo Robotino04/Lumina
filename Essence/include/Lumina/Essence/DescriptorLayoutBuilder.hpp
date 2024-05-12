@@ -18,9 +18,9 @@ public:
     }
 
     [[nodiscard]]
-    vk::DescriptorSetLayout build(vk::Device device, vk::ShaderStageFlags shaderStages) {
-        for (auto& b : bindings) {
-            b.stageFlags |= shaderStages;
+    vk::DescriptorSetLayout Build(vk::Device device, vk::ShaderStageFlags shaderStages) {
+        for (auto& binding : bindings) {
+            binding.stageFlags |= shaderStages;
         }
 
         vk::DescriptorSetLayoutCreateInfo info = {

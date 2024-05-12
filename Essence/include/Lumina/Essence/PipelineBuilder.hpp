@@ -2,7 +2,7 @@
 
 #include <vector>
 
-#include "Lumina/Essence/Vulkan.hpp"
+#include "Lumina/Essence/Vulkan.hpp" // IWYU pragma: keep
 
 namespace Lumina::Essence {
 

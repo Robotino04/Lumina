@@ -1,6 +1,7 @@
 #include "Lumina/Essence/DeletionQueue.hpp"
 
 #include <iostream>
+#include <ranges>
 
 namespace Lumina::Essence {
 
@@ -11,9 +12,9 @@ void DeletionQueue::PushBack(std::function<void()> const&& deletor, std::string 
     queue.emplace_back(deletor, name);
 }
 void DeletionQueue::Flush() {
-    for (auto it = queue.rbegin(); it != queue.rend(); it++) {
-        std::get<0> (*it)();
-        std::cout << "Deleted " << std::get<1>(*it) << "\n";
+    for (auto& it : std::ranges::reverse_view(queue)) {
+        std::get<0>(it)();
+        std::cout << "Deleted " << std::get<1>(it) << "\n";
     }
 
     queue.clear();

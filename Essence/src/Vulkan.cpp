@@ -32,7 +32,7 @@ vk::RenderingInfo CreateRenderingInfo(vk::Extent2D renderExtent, vk::RenderingAt
 }
 
 vk::ShaderModule LoadShaderModule(std::string const& filename, vk::Device device) {
-    std::vector<uint8_t> bytes = readBinaryFile(filename);
+    std::vector<uint8_t> bytes = ReadBinaryFile(filename);
     std::vector<uint32_t> buffer(bytes.size() / sizeof(uint32_t));
 
     std::memcpy(buffer.data(), bytes.data(), bytes.size());

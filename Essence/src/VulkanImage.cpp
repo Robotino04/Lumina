@@ -21,15 +21,16 @@ VulkanImage::VulkanImage(Application& app, vk::Format format, vk::ImageUsageFlag
         vk::ImageTiling::eOptimal,   // image tiling
         usageFlags,                  // usage flags
     };
-    VkImageCreateInfo old_imageInfo = imageInfo;
+    VkImageCreateInfo oldImageInfo = imageInfo;
 
     VmaAllocationCreateInfo allocInfo = {};
     allocInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
     allocInfo.requiredFlags = static_cast<VkMemoryPropertyFlags>(vk::MemoryPropertyFlagBits::eDeviceLocal);
 
-    VkImage old_image;
-    vmaCreateImage(app.allocator, &old_imageInfo, &allocInfo, &old_image, &allocation, nullptr);
-    image = old_image;
+    allocation = {};
+    VkImage oldImage = nullptr;
+    vmaCreateImage(app.allocator, &oldImageInfo, &allocInfo, &oldImage, &allocation, nullptr);
+    image = oldImage;
 
     vk::ImageViewCreateInfo viewInfo = {
         {},                                              // flags
@@ -55,11 +56,13 @@ VulkanImage::VulkanImage() {
     destroyed = true;
 }
 
-VulkanImage::VulkanImage(VulkanImage&& other) {
+VulkanImage::VulkanImage(VulkanImage&& other) noexcept { // NOLINT(cppcoreguidelines-pro-type-member-init) it does initialize everything
     *this = std::move(other);
 }
-VulkanImage& VulkanImage::operator=(VulkanImage&& other) {
-    if (!destroyed) Destroy();
+VulkanImage& VulkanImage::operator=(VulkanImage&& other) noexcept {
+    if (!destroyed) {
+        Destroy();
+    }
 
     image = other.image;
     other.image = vk::Image{};
@@ -83,7 +86,9 @@ VulkanImage& VulkanImage::operator=(VulkanImage&& other) {
 
 
 VulkanImage::~VulkanImage() {
-    if (!destroyed) Destroy();
+    if (!destroyed) {
+        Destroy();
+    }
 }
 
 void VulkanImage::Destroy() {
@@ -100,7 +105,7 @@ void VulkanImage::Destroy() {
 }
 
 
-void VulkanImage::Blit(vk::CommandBuffer cmd, vk::Image source, vk::Image destination, vk::Extent2D sourceSize, vk::Extent2D destinationSize) {
+void VulkanImage::Blit(vk::CommandBuffer cmd, vk::Image source, vk::Image target, vk::Extent2D sourceSize, vk::Extent2D targetSize) {
     // clang-format off
     vk::ImageBlit2 blitRegion = {
         vk::ImageSubresourceLayers{
@@ -125,11 +130,10 @@ void VulkanImage::Blit(vk::CommandBuffer cmd, vk::Image source, vk::Image destin
             1,                               // num array layers
         }, // destination subresource
         {
-            
             vk::Offset3D{},
             vk::Offset3D{
-                static_cast<int32_t>(destinationSize.width),
-                static_cast<int32_t>(destinationSize.height),
+                static_cast<int32_t>(targetSize.width),
+                static_cast<int32_t>(targetSize.height),
                 1,
             },
         }, // destination offsets
@@ -139,7 +143,7 @@ void VulkanImage::Blit(vk::CommandBuffer cmd, vk::Image source, vk::Image destin
     vk::BlitImageInfo2 blitInfo = {
         source,                               // source image
         vk::ImageLayout::eTransferSrcOptimal, // source layout
-        destination,                          // destination image
+        target,                               // destination image
         vk::ImageLayout::eTransferDstOptimal, // destination layout
         blitRegion,                           // region
         vk::Filter::eLinear,                  // sampling filter
@@ -149,8 +153,8 @@ void VulkanImage::Blit(vk::CommandBuffer cmd, vk::Image source, vk::Image destin
 }
 
 
-void VulkanImage::Transition(vk::CommandBuffer cmd, vk::Image img, vk::ImageLayout oldLayout, vk::ImageLayout newLayout) {
-    vk::ImageAspectFlags aspectMask = (newLayout == vk::ImageLayout::eDepthAttachmentOptimal)
+void VulkanImage::Transition(vk::CommandBuffer cmd, vk::Image img, vk::ImageLayout srcLayout, vk::ImageLayout dstLayout) {
+    vk::ImageAspectFlags aspectMask = (dstLayout == vk::ImageLayout::eDepthAttachmentOptimal)
                                         ? vk::ImageAspectFlagBits::eDepth
                                         : vk::ImageAspectFlagBits::eColor;
 
@@ -160,8 +164,8 @@ void VulkanImage::Transition(vk::CommandBuffer cmd, vk::Image img, vk::ImageLayo
         vk::AccessFlagBits2::eMemoryWrite,                                    // source access mask
         vk::PipelineStageFlagBits2::eAllCommands,                             // destination stage mask
         vk::AccessFlagBits2::eMemoryWrite | vk::AccessFlagBits2::eMemoryRead, // destination access mask
-        oldLayout,                                                            // current layout
-        newLayout,                                                            // new layout
+        srcLayout,                                                            // current layout
+        dstLayout,                                                            // new layout
         0,                                                                    // source queue family index
         0,                                                                    // dest queue family index
         img,

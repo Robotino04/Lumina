@@ -6,6 +6,6 @@
 
 namespace Lumina::Essence {
 
-std::vector<uint8_t> readBinaryFile(std::string const& path);
+std::vector<uint8_t> ReadBinaryFile(std::string const& path);
 
 }

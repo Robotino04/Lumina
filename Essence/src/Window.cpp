@@ -1,9 +1,6 @@
 #include "Lumina/Essence/Window.hpp"
-#include "Lumina/Essence/Utils/unimplemented.hpp"
 
 #include <SDL3/SDL_vulkan.h>
-
-#include <iostream>
 
 namespace Lumina::Essence {
 
@@ -26,7 +23,7 @@ std::optional<SDL_Event> Window::GetEvent() {
 
 
 vk::SurfaceKHR Window::CreateWindowSurface(vk::Instance instance) const {
-    VkSurfaceKHR surface;
+    VkSurfaceKHR surface = nullptr;
     if (SDL_Vulkan_CreateSurface(window, instance, nullptr, &surface) != SDL_TRUE) {
         throw std::runtime_error(std::format("SDL Error: {}", SDL_GetError()));
     }

@@ -58,7 +58,7 @@ protected:
     std::array<FrameData, 2> frames;
 
     Window window;
-    uint32_t currentImageIndex;
+    uint32_t currentImageIndex = 0;
 
     vk::Instance instance;
     vk::DebugUtilsMessengerEXT debugMessenger;

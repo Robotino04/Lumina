@@ -8,6 +8,7 @@
 
 #include <VkBootstrap.h>
 
+#include <cmath>
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtx/color_space.hpp>
@@ -24,7 +25,14 @@
 namespace Lumina::Essence {
 
 Application::Application(glm::ivec2 windowSize, std::string const& windowTitle)
-    : name(windowTitle), window(windowSize, windowTitle), windowTitle(windowTitle), windowSize(windowSize) {}
+    : name(windowTitle),
+      window(windowSize, windowTitle),
+      windowTitle(windowTitle),
+      windowSize(windowSize),
+      allocator(),
+      swapchainImageFormat(),
+      graphicsQueueFamily() {}
+
 Application::~Application() {
     std::cout << "Application shutting down...\n";
 
@@ -77,12 +85,12 @@ void Application::InitVulkan() {
     mainDeletionQueue.PushBack([&]() { instance.destroySurfaceKHR(surface); }, "surface");
 
     vk::PhysicalDeviceVulkan12Features features12;
-    features12.bufferDeviceAddress = true;
-    features12.descriptorIndexing = true;
+    features12.bufferDeviceAddress = vk::True;
+    features12.descriptorIndexing = vk::True;
 
     vk::PhysicalDeviceVulkan13Features features13;
-    features13.dynamicRendering = true;
-    features13.synchronization2 = true;
+    features13.dynamicRendering = vk::True;
+    features13.synchronization2 = vk::True;
 
     vkb::PhysicalDeviceSelector selector(vkbInstance);
     vkb::PhysicalDevice vkbPhysicalDevice = selector.set_minimum_version(1, 3)
@@ -211,7 +219,7 @@ void Application::InitDescriptors() {
     {
         DescriptorLayoutBuilder builder;
         builder.AddBinding(0, vk::DescriptorType::eStorageImage);
-        drawImageDescriptorLayout = builder.build(device, vk::ShaderStageFlagBits::eCompute);
+        drawImageDescriptorLayout = builder.Build(device, vk::ShaderStageFlagBits::eCompute);
     }
 
     drawImageDescriptors = globalDescriptorAllocator.Allocate(drawImageDescriptorLayout);
@@ -246,7 +254,7 @@ void Application::InitPipelines() {
     std::cout << "Pipelines initialized\n";
 }
 void Application::InitImgui() {
-    std::array<vk::DescriptorPoolSize, 11> pool_sizes = {
+    std::array<vk::DescriptorPoolSize, 11> poolSizes = {
         {
          {vk::DescriptorType::eSampler, 1000},
          {vk::DescriptorType::eCombinedImageSampler, 1000},
@@ -265,7 +273,7 @@ void Application::InitImgui() {
     vk::DescriptorPoolCreateInfo poolInfo = {
         {},
         1000,
-        pool_sizes,
+        poolSizes,
     };
 
     vk::DescriptorPool imguiPool = device.createDescriptorPool(poolInfo);
@@ -279,7 +287,7 @@ void Application::InitImgui() {
 
     ImGui::StyleColorsDark();
 
-    ImGui_ImplSDL3_InitForVulkan(window.getRawWindow());
+    ImGui_ImplSDL3_InitForVulkan(window.GetRawWindow());
 
     ImGui_ImplVulkan_InitInfo initInfo = {
         .Instance = instance,
@@ -412,13 +420,14 @@ void Application::CreateSwapchain(glm::ivec2 size) {
     mainDeletionQueue.PushBack([&]() { device.destroySwapchainKHR(swapchain); }, "swapchain");
 
     auto images = vkbSwapchain.get_images().value();
-    for (auto img : images)
-        swapchainImages.push_back(img);
+    for (auto* img : images) {
+        swapchainImages.emplace_back(img);
+    }
 
     auto imageViews = vkbSwapchain.get_image_views().value();
     int i = 0;
-    for (auto imgView : imageViews) {
-        swapchainImageViews.push_back(imgView);
+    for (auto* imgView : imageViews) {
+        swapchainImageViews.emplace_back(imgView);
         mainDeletionQueue.PushBack([=, this]() { device.destroyImageView(imgView); }, std::format("image view F{}", i));
         i++;
     }
@@ -446,7 +455,7 @@ void Application::SubmitImmediately(std::function<void(vk::CommandBuffer)>&& fun
     };
 
     graphicsQueue.submit2(submit, immediateFence);
-    VkCheck(device.waitForFences(immediateFence, true, UINT64_MAX));
+    VkCheck(device.waitForFences(immediateFence, vk::True, UINT64_MAX));
 }
 
 VKAPI_ATTR VkBool32 VKAPI_CALL Application::VulkanDebugCallback(
@@ -464,11 +473,12 @@ VKAPI_ATTR VkBool32 VKAPI_CALL Application::VulkanDebugCallback(
 }
 
 void Application::Run() {
-    if (!isInitialized)
+    if (!isInitialized) {
         throw std::logic_error(
             "Tried running application without initializing it first. Maybe call the parents Initialize() "
             "functions in derived classes."
         );
+    }
 
     isRunning = true;
     double dt = 1.0f / 60.0f;
@@ -505,7 +515,7 @@ void Application::Exit() {
 void Application::Tick(float dt) {}
 
 void Application::PreRender(float dt) {
-    VkCheck(device.waitForFences(GetCurrentFrame().renderFence, true, UINT64_MAX));
+    VkCheck(device.waitForFences(GetCurrentFrame().renderFence, vk::True, UINT64_MAX));
     GetCurrentFrame().deletionQueue.Flush();
 
     device.resetFences(GetCurrentFrame().renderFence);
@@ -540,7 +550,8 @@ void Application::Render(float dt) {
     pc.color1 = glm::vec4(glm::rgbColor(glm::hsvColor(pc.color1.xyz()) + glm::vec3(dt * 10, 0, 0)), 1.0);
 
     const float minAxis = glm::min(windowSize.x, windowSize.y);
-    pc.samplePoint = glm::vec2(windowSize) / 2.0f + glm::vec2(minAxis, minAxis) / 4.0f * glm::vec2(cos(time), sin(time));
+    pc.samplePoint = glm::vec2(windowSize) / 2.0f
+                   + glm::vec2(minAxis, minAxis) / 4.0f * glm::vec2(std::cos(time), std::sin(time));
 
     ImGui::Begin("Shader Settings");
     ImGui::Text("Time: %f", time);

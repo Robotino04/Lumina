@@ -1,9 +1,9 @@
 #pragma once
 
 #define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
-#include <vulkan/vulkan.hpp>
+#include <vulkan/vulkan.hpp> // IWYU pragma: export
 
-#include <vk_mem_alloc.h>
+#include <vk_mem_alloc.h>    // IWYU pragma: export
 
 namespace Lumina::Essence {
 

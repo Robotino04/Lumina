@@ -8,7 +8,7 @@ namespace Lumina::Essence {
     #define LUMINA_RELEASE
 #endif
 
-enum BuildMode {
+enum class BuildMode {
     Debug,
     Release,
 

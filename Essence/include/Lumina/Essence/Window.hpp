@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Lumina/Essence/Vulkan.hpp"
+#include "Lumina/Essence/Vulkan.hpp" // IWYU pragma: keep
 #include "Lumina/Essence/Utils/NonCopyable.hpp"
 
 #include <SDL3/SDL.h>
@@ -18,7 +18,7 @@ public:
 
     std::optional<SDL_Event> GetEvent();
 
-    inline SDL_Window* getRawWindow() {
+    inline SDL_Window* GetRawWindow() {
         return window;
     }
 

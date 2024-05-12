@@ -6,7 +6,7 @@ Language: Cpp
 AlignEscapedNewlines: Left
 AllowShortCaseLabelsOnASingleLine: true
 AllowShortFunctionsOnASingleLine: Empty
-AllowShortIfStatementsOnASingleLine: Always
+# AllowShortIfStatementsOnASingleLine: Always
 # AllowShortLoopsOnASingleLine: true
 AlwaysBreakBeforeMultilineStrings: true
 BraceWrapping:
