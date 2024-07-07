@@ -8,6 +8,9 @@ Window::Window(glm::ivec2 size, std::string const& title) {
     SDL_Init(SDL_INIT_VIDEO);
 
     window = SDL_CreateWindow(title.c_str(), size.x, size.y, SDL_WINDOW_VULKAN);
+    if (window == nullptr) {
+        throw std::runtime_error(std::format("SDL Error: {}", SDL_GetError()));
+    }
     SDL_StartTextInput(window);
 }
 
@@ -24,7 +27,7 @@ std::optional<SDL_Event> Window::GetEvent() {
 
 vk::SurfaceKHR Window::CreateWindowSurface(vk::Instance instance) const {
     VkSurfaceKHR surface = nullptr;
-    if (SDL_Vulkan_CreateSurface(window, instance, nullptr, &surface) != SDL_TRUE) {
+    if (SDL_Vulkan_CreateSurface(window, instance, nullptr, &surface) != 0) {
         throw std::runtime_error(std::format("SDL Error: {}", SDL_GetError()));
     }
     return surface;
